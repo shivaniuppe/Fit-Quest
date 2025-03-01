@@ -1,10 +1,10 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import LoginScreen from "/Users/shivaniuppe/Desktop/FitQuest/components/screens/LoginScreen.js";
-import SignupScreen from "/Users/shivaniuppe/Desktop/FitQuest/components/screens/SignupScreen.js";
-import MainHomeScreen from "/Users/shivaniuppe/Desktop/FitQuest/components/screens/HomeScreen.js";
-import ForgotPasswordScreen from "/Users/shivaniuppe/Desktop/FitQuest/components/screens/ForgotPasswordScreen.js"; // Import Forgot Password Screen
+import LoginScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/LoginScreen.js";
+import SignupScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/SignupScreen.js";
+import MainHomeScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/HomeScreen.js";
+import ForgotPasswordScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/ForgotPasswordScreen.js"; // Import Forgot Password Screen
 import { useEffect } from "react";
 import { uploadQuests } from "./components/utils/uploadQuests"; 
 

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import { db } from "/Users/shivaniuppe/Desktop/FitQuest/firebaseConfig.js";
-import { collection, getDocs } from "firebase/firestore";
+import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { collection, getDocs, doc, updateDoc, getDoc } from "firebase/firestore";
 
 const QuestsScreen = ({ navigation }) => {
   const [quests, setQuests] = useState([]);
+  const [acceptedQuests, setAcceptedQuests] = useState([]);
 
   useEffect(() => {
     const fetchQuests = async () => {
@@ -14,7 +15,24 @@ const QuestsScreen = ({ navigation }) => {
       setQuests(questsData);
     };
 
+    const fetchAcceptedQuests = async () => {
+      if (!auth.currentUser) return;
+      const userId = auth.currentUser.uid;
+      const userRef = doc(db, "users", userId); // Fetching from the user's document
+
+      try {
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setAcceptedQuests(userData.acceptedQuests || []);
+        }
+      } catch (error) {
+        console.error("Error fetching accepted quests:", error);
+      }
+    };
+
     fetchQuests();
+    fetchAcceptedQuests();
   }, []);
 
   return (
@@ -47,8 +65,31 @@ const QuestsScreen = ({ navigation }) => {
               </View>
             </View>
             <Text style={styles.questXP}>⭐ {item.xp} XP</Text>
-            <TouchableOpacity style={styles.acceptButton}>
-              <Text style={styles.acceptButtonText}>Accept Quest</Text>
+            <TouchableOpacity 
+              style={[styles.acceptButton, acceptedQuests.includes(item.id) && { backgroundColor: "gray" }]} 
+              onPress={async () => {
+                if (!auth.currentUser || acceptedQuests.includes(item.id)) return;
+                
+                const userId = auth.currentUser.uid;
+                const userRef = doc(db, "users", userId); // Update user document
+
+                try {
+                  const userSnap = await getDoc(userRef);
+                  if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    const updatedQuests = [...(userData.acceptedQuests || []), item.id];
+
+                    await updateDoc(userRef, { acceptedQuests: updatedQuests });
+                    setAcceptedQuests(updatedQuests);
+                    alert("Quest accepted!");
+                  }
+                } catch (error) {
+                  console.error("Error accepting quest:", error);
+                }
+              }}
+              disabled={acceptedQuests.includes(item.id)}
+            >
+              <Text style={styles.acceptButtonText}>{acceptedQuests.includes(item.id) ? "Accepted" : "Accept Quest"}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -57,34 +98,21 @@ const QuestsScreen = ({ navigation }) => {
   );
 };
 
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#121212", padding: 20 },
-    
-    // Header
-    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-    headerIcons: { flexDirection: "row", alignItems: "center" },
-    xpText: { color: "white", fontSize: 16, fontWeight: "bold", marginRight: 10 },
-    avatar: { width: 35, height: 35, borderRadius: 17.5 },
-  
-    // Background Placeholder
-    backgroundText: { color: "#555", textAlign: "center", marginBottom: 15, fontSize: 14 },
-  
-    // Title
-    title: { color: "white", fontSize: 20, fontWeight: "bold", marginBottom: 15 },
-  
-    // Quest Cards
-    questCard: { backgroundColor: "#242424", padding: 15, borderRadius: 10, marginBottom: 15 },
-    questInfo: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-    questIcon: { marginRight: 10 },
-    questTitle: { color: "white", fontSize: 16, fontWeight: "bold" },
-    questCategory: { color: "#aaa", fontSize: 14 },
-    questXP: { color: "white", alignSelf: "flex-end", fontSize: 14, marginBottom: 10 },
-  
-    // Accept Button
-    acceptButton: { backgroundColor: "#3A3A3A", padding: 10, borderRadius: 5, alignItems: "center" },
-    acceptButtonText: { color: "white", fontSize: 14, fontWeight: "bold" },
-  });
-  
+  container: { flex: 1, backgroundColor: "#121212", padding: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  headerIcons: { flexDirection: "row", alignItems: "center" },
+  xpText: { color: "white", fontSize: 16, fontWeight: "bold", marginRight: 10 },
+  avatar: { width: 35, height: 35, borderRadius: 17.5 },
+  title: { color: "white", fontSize: 20, fontWeight: "bold", marginBottom: 15 },
+  questCard: { backgroundColor: "#242424", padding: 15, borderRadius: 10, marginBottom: 15 },
+  questInfo: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  questIcon: { marginRight: 10 },
+  questTitle: { color: "white", fontSize: 16, fontWeight: "bold" },
+  questCategory: { color: "#aaa", fontSize: 14 },
+  questXP: { color: "white", alignSelf: "flex-end", fontSize: 14, marginBottom: 10 },
+  acceptButton: { backgroundColor: "#3A3A3A", padding: 10, borderRadius: 5, alignItems: "center" },
+  acceptButtonText: { color: "white", fontSize: 14, fontWeight: "bold" },
+});
 
 export default QuestsScreen;

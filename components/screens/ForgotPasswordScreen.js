@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "/Users/shivaniuppe/Desktop/FitQuest/firebaseConfig.js";
+import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState("");

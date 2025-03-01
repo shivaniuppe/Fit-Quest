@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "/Users/shivaniuppe/Desktop/FitQuest/firebaseConfig.js";
+import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "/Users/shivaniuppe/Desktop/FitQuest/firebaseConfig.js"; 
+import { db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js"; 
 import { FontAwesome } from "@expo/vector-icons"; // Import FontAwesome for icons
 //import { signInWithGoogle, signInWithApple, signInWithFacebook } from "/Users/shivaniuppe/Desktop/FitQuest/components/utils/authMethods.js";
 
