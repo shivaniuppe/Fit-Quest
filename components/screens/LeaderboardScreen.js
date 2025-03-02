@@ -1,20 +1,59 @@
-import React from "react";
-import { View, Text, FlatList, Image, StyleSheet } from "react-native";
-import { FontAwesome, Ionicons } from "@expo/vector-icons";
-
-const topPlayers = [
-  { id: "1", name: "Mike R.", xp: "28,890 XP", position: "1st", avatar: "😎" },
-  { id: "2", name: "Sarah K.", xp: "24,650 XP", position: "2nd", avatar: "😊" },
-  { id: "3", name: "Alex M.", xp: "22,340 XP", position: "3rd", avatar: "😌" },
-];
-
-const players = [
-  { id: "4", name: "You", xp: "21,450 XP", isYou: true, avatar: "😃" },
-  { id: "5", name: "Emma S.", xp: "20,890 XP", avatar: "🙂" },
-  { id: "6", name: "John D.", xp: "19,670 XP", avatar: "🖼️" }, // Placeholder for image
-];
+import React, { useEffect, useState } from "react";
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from "react-native";
+import { FontAwesome } from "@expo/vector-icons";
+import { collection, getDocs } from "firebase/firestore";
+import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 
 const LeaderboardScreen = () => {
+  const [topPlayers, setTopPlayers] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        const usersData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          isYou: doc.id === auth.currentUser?.uid, // Highlight the current user
+        }));
+
+        // Sort users by XP in descending order
+        const sortedUsers = usersData.sort((a, b) => b.xp - a.xp);
+
+        // Format XP with commas (e.g., 28890 -> "28,890")
+        const formatXP = (xp) => xp.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+        // Top 3 players
+        const topPlayers = sortedUsers.slice(0, 3).map((player, index) => ({
+          ...player,
+          xp: `${formatXP(player.xp)} XP`,
+          position: `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`,
+        }));
+
+        // Other players
+        const otherPlayers = sortedUsers.slice(3).map((player) => ({
+          ...player,
+          xp: `${formatXP(player.xp)} XP`,
+        }));
+
+        setTopPlayers(topPlayers);
+        setPlayers(otherPlayers);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="white" style={{ flex: 1 }} />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -28,7 +67,7 @@ const LeaderboardScreen = () => {
         {topPlayers.map((player) => (
           <View key={player.id} style={styles.topCard}>
             <Text style={styles.positionText}>{player.position}</Text>
-            <Text style={styles.avatar}>{player.avatar}</Text>
+            <Text style={styles.avatar}>{player.avatar || "👤"}</Text>
             <Text style={styles.playerName}>{player.name}</Text>
             <Text style={styles.xpText}>{player.xp}</Text>
           </View>
@@ -42,7 +81,7 @@ const LeaderboardScreen = () => {
         renderItem={({ item }) => (
           <View style={[styles.playerRow, item.isYou && styles.highlighted]}>
             <Text style={styles.rankText}>{item.id}</Text>
-            <Text style={styles.avatar}>{item.avatar}</Text>
+            <Text style={styles.avatar}>{item.avatar || "👤"}</Text>
             <View>
               <Text style={styles.playerName}>{item.name}</Text>
               <Text style={styles.xpText}>{item.xp}</Text>
@@ -51,7 +90,6 @@ const LeaderboardScreen = () => {
           </View>
         )}
       />
-
     </View>
   );
 };
@@ -60,7 +98,7 @@ export default LeaderboardScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
-  
+
   // Header
   header: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
   headerTitle: { color: "white", fontSize: 20, fontWeight: "bold", marginLeft: 10 },
@@ -78,7 +116,4 @@ const styles = StyleSheet.create({
   highlighted: { backgroundColor: "#333" },
   rankText: { color: "white", fontSize: 16, fontWeight: "bold", width: 30 },
   crownIcon: { marginLeft: "auto" },
-
-  // Bottom Navigation
-  bottomNav: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 15, backgroundColor: "#242424", borderRadius: 10 },
 });

@@ -4,6 +4,9 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js"; 
+import ProfileSetupScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/ProfileSetupScreen.js"; // Import Forgot Password Screen
+
+
 import { FontAwesome } from "@expo/vector-icons"; // Import FontAwesome for icons
 //import { signInWithGoogle, signInWithApple, signInWithFacebook } from "/Users/shivaniuppe/Desktop/FitQuest/components/utils/authMethods.js";
 
@@ -19,22 +22,11 @@ export default function SignupScreen({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
   
-      // Store user profile in Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      // Navigate to Profile Setup screen
+      navigation.navigate("ProfileSetup", {
         userId: user.uid,
-        name: "",  // Empty field, user can update later
         email: user.email,
-        xp: 0,
-        level: 1,
-        completedQuests: [],
-        totalSteps: 0,
-        achievements: [],
-        friends: [],
-        createdAt: new Date().toISOString()
       });
-  
-      // Navigate to Home screen
-      navigation.navigate("Home");
     } catch (err) {
       setError(err.message);
     }

@@ -66,30 +66,42 @@ const QuestsScreen = ({ navigation }) => {
             </View>
             <Text style={styles.questXP}>⭐ {item.xp} XP</Text>
             <TouchableOpacity 
-              style={[styles.acceptButton, acceptedQuests.includes(item.id) && { backgroundColor: "gray" }]} 
+              style={[
+                styles.acceptButton, 
+                acceptedQuests.some((quest) => quest.id === item.id) && { backgroundColor: "gray" }
+              ]} 
               onPress={async () => {
-                if (!auth.currentUser || acceptedQuests.includes(item.id)) return;
+                if (!auth.currentUser || acceptedQuests.some((quest) => quest.id === item.id)) return;
                 
                 const userId = auth.currentUser.uid;
-                const userRef = doc(db, "users", userId); // Update user document
+                const userRef = doc(db, "users", userId);
 
                 try {
                   const userSnap = await getDoc(userRef);
                   if (userSnap.exists()) {
                     const userData = userSnap.data();
-                    const updatedQuests = [...(userData.acceptedQuests || []), item.id];
+                    const updatedQuests = [
+                      ...(userData.acceptedQuests || []),
+                      {
+                        id: item.id, // Quest ID
+                        status: "accepted", // Initial status
+                        totalXP: item.xp, // Total XP from the quest
+                      },
+                    ];
 
                     await updateDoc(userRef, { acceptedQuests: updatedQuests });
-                    setAcceptedQuests(updatedQuests);
+                    setAcceptedQuests(updatedQuests); // Update the state with the new array of objects
                     alert("Quest accepted!");
                   }
                 } catch (error) {
                   console.error("Error accepting quest:", error);
                 }
               }}
-              disabled={acceptedQuests.includes(item.id)}
+              disabled={acceptedQuests.some((quest) => quest.id === item.id)}
             >
-              <Text style={styles.acceptButtonText}>{acceptedQuests.includes(item.id) ? "Accepted" : "Accept Quest"}</Text>
+              <Text style={styles.acceptButtonText}>
+                {acceptedQuests.some((quest) => quest.id === item.id) ? "Accepted" : "Accept Quest"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
