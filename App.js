@@ -5,8 +5,9 @@ import LoginScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens
 import SignupScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/SignupScreen.js";
 import MainHomeScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/HomeScreen.js";
 import ForgotPasswordScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/ForgotPasswordScreen.js";
-import ProfileSetupScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/ProfileSetupScreen.js"; // Import Forgot Password Screen
- // Import Forgot Password Screen
+import ProfileSetupScreen from "/Users/shivaniuppe/Desktop/Fit-Quest/components/screens/ProfileSetupScreen.js";
+import RunQuestScreen from "./components/QuestScreens/RunQuestScreen";
+import JourneyScreen from "./components/QuestScreens/JourneyScreen";
 import { useEffect } from "react";
 import { uploadQuests } from "./components/utils/uploadQuests"; 
 
@@ -24,6 +25,8 @@ export default function App() {
         <Stack.Screen name="Home" component={MainHomeScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} /> 
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+        <Stack.Screen name="RunQuestScreen" component={RunQuestScreen} />
+        <Stack.Screen name="JourneyScreen" component={JourneyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
