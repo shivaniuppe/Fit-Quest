@@ -5,6 +5,7 @@ import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import MapView, { Marker } from "react-native-maps";
 import { useNavigation } from "@react-navigation/native";
+import { GOOGLE_API_KEY } from '/Users/shivaniuppe/Desktop/Fit-Quest/secrets.js';
 
 
 
@@ -32,7 +33,7 @@ const RunQuestScreen = ({ route }) => {
 
   // Fetch nearby destinations
   const fetchNearbyDestinations = async (latitude, longitude) => {
-    const apiKey = "AIzaSyC9GY3MV6eBIsHyT7FoVThgfYbzrr8N4j4";
+    const apiKey = GOOGLE_API_KEY;
     const radius = 500; // Search within 2 km
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&key=${apiKey}`;
 

@@ -4,6 +4,7 @@ import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
 import { useNavigation } from "@react-navigation/native";
+import { GOOGLE_API_KEY } from '/Users/shivaniuppe/Desktop/Fit-Quest/secrets.js';
 
 const JourneyScreen = ({ route }) => {
   const { destination, quest } = route.params; // Get destination and quest data
@@ -168,7 +169,7 @@ const JourneyScreen = ({ route }) => {
             <MapViewDirections
               origin={origin}
               destination={memoizedDestination}
-              apikey="AIzaSyC9GY3MV6eBIsHyT7FoVThgfYbzrr8N4j4"
+              apikey={GOOGLE_API_KEY}
               strokeWidth={3}
               strokeColor="blue"
             />
