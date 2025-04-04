@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Progress from 'react-native-progress';
-import { auth, db } from '/Users/shivaniuppe/Desktop/Fit-Quest/secrets.js';
+import { auth, db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const TimedQuestScreen = () => {
   const navigation = useNavigation();
@@ -128,6 +129,7 @@ const TimedQuestScreen = () => {
   };
 
   const progress = 1 - timeLeft / initialTime;
+  
 
   return (
     <View style={styles.container}>

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 
 const WellnessQuestScreen = () => {
@@ -11,6 +12,29 @@ const WellnessQuestScreen = () => {
   const { quest } = route.params;
 
   const [checkedOff, setCheckedOff] = useState(false);
+  const [wasResumed, setWasResumed] = useState(false);
+
+  useEffect(() => {
+    const loadSavedState = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(`wellnessState_${quest.id}`);
+        if (saved === 'true') {
+          setCheckedOff(true);
+          setWasResumed(true);
+        }
+      } catch (error) {
+        console.error('Error loading saved state:', error);
+      }
+    };
+
+    loadSavedState();
+  }, [quest.id]);
+
+  useEffect(() => {
+    if (checkedOff) {
+      AsyncStorage.setItem(`wellnessState_${quest.id}`, 'true');
+    }
+  }, [checkedOff, quest.id]);
 
   const handleCompleteQuest = async () => {
     if (!auth.currentUser) return;
@@ -26,6 +50,8 @@ const WellnessQuestScreen = () => {
         completedAt: serverTimestamp(),
         progress: 1,
       });
+
+      await AsyncStorage.removeItem(`wellnessState_${quest.id}`);
 
       const questSnap = await getDoc(questRef);
       const userSnap = await getDoc(userRef);
@@ -68,7 +94,7 @@ const WellnessQuestScreen = () => {
         onPress={() => setCheckedOff(!checkedOff)}
       >
         <Text style={styles.checkButtonText}>
-          {checkedOff ? '✔ Marked as Done' : 'Mark as Done'}
+          {checkedOff ? (wasResumed ? '✔ Resumed - Marked as Done' : '✔ Marked as Done') : 'Mark as Done'}
         </Text>
       </TouchableOpacity>
 

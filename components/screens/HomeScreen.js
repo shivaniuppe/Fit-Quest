@@ -14,6 +14,7 @@ import ProfileScreen from "./ProfileScreen";
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { getWeatherData, getWeatherIcon, getWorkoutSuggestion } from '/Users/shivaniuppe/Desktop/Fit-Quest/components/utils/weatherService.js';
+import { deleteDoc } from "firebase/firestore";
 
 const MainHomeScreen = () => {
   const [steps, setSteps] = useState(0);
@@ -363,10 +364,7 @@ const MainHomeScreen = () => {
     const userQuestRef = doc(db, "userQuests", `${userId}_${questToAbandon.id}`);
   
     try {
-      await updateDoc(userQuestRef, {
-        status: "abandoned",
-        abandonedAt: serverTimestamp(),
-      });
+      await deleteDoc(userQuestRef); // 🔥 delete instead of updating status
   
       setAcceptedQuests((prev) =>
         prev.filter((quest) => quest.id !== questToAbandon.id)
@@ -375,13 +373,13 @@ const MainHomeScreen = () => {
       setQuestToAbandon(null);
   
       alert("Quest abandoned. It'll return to the available quests.");
+      navigation.navigate("Quests"); // 👈 send user to Quests screen
+  
     } catch (error) {
       console.error("Error abandoning quest:", error);
       alert("Failed to abandon quest. Try again.");
     }
   };
-  
-  
 
   return (
     <View style={styles.container}>
@@ -549,31 +547,31 @@ const MainHomeScreen = () => {
         </View>
       )}
       {showAbandonModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalText}>
-              Are you sure you want to abandon "{questToAbandon?.title}"?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowAbandonModal(false);
-                  setQuestToAbandon(null);
-                }}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmAbandonButton}
-                onPress={handleAbandonQuest}
-              >
-                <Text style={styles.buttonText}>Yes, Abandon</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalBox}>
+          <Text style={styles.modalText}>
+            Are you sure you want to abandon "{questToAbandon?.title}"?
+          </Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setShowAbandonModal(false);
+                setQuestToAbandon(null);
+              }}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmAbandonButton}
+              onPress={handleAbandonQuest}
+            >
+              <Text style={styles.buttonText}>Yes, Abandon</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
+      </View>
+    )}
 
     </View>
   

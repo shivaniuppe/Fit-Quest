@@ -80,7 +80,7 @@ const sampleQuests = [
   
     // Core Challenges
     { 
-      title: "Plank for 1 Minute", 
+      title: "Plank for 10 Seconds", 
       category: "Core Challenge",
       environment: "Indoor",
       activityType: "Timed",
@@ -89,7 +89,7 @@ const sampleQuests = [
       icon: "stopwatch", 
       iconType: "FontAwesome5", 
       status: "active", 
-      goal: "1:00" 
+      goal: "0:10" 
     },
   
     // Health Challenges
