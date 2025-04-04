@@ -10,6 +10,7 @@ import RunQuestScreen from "./components/QuestScreens/RunQuestScreen";
 import JourneyScreen from "./components/QuestScreens/JourneyScreen";
 import { useEffect } from "react";
 import { uploadQuests } from "./components/utils/uploadQuests"; 
+import RepsQuestScreen from "./components/QuestScreens/RepsQuestScreen";
 
 const Stack = createStackNavigator();
 
@@ -27,6 +28,8 @@ export default function App() {
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="RunQuestScreen" component={RunQuestScreen} />
         <Stack.Screen name="JourneyScreen" component={JourneyScreen} />
+        <Stack.Screen name="RepsQuestScreen" component={RepsQuestScreen} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

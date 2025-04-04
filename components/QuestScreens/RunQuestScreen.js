@@ -34,7 +34,7 @@ const RunQuestScreen = ({ route }) => {
   // Fetch nearby destinations
   const fetchNearbyDestinations = async (latitude, longitude) => {
     const apiKey = GOOGLE_API_KEY;
-    const radius = 500; // Search within 2 km
+    const radius = 2000; // Search within 2 km
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&key=${apiKey}`;
 
     try {

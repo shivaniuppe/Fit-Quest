@@ -1,35 +1,36 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 
 const LeaderboardScreen = () => {
   const [topPlayers, setTopPlayers] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    setLoading(true);
+    const usersQuery = query(collection(db, "users"), orderBy("xp", "desc"));
+    
+    // onSnapshot returns an unsubscribe function
+    const unsubscribe = onSnapshot(usersQuery, (querySnapshot) => {
       try {
-        const querySnapshot = await getDocs(collection(db, "users"));
         const usersData = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          isYou: doc.id === auth.currentUser?.uid, // Highlight the current user
+          isYou: doc.id === auth.currentUser?.uid,
         }));
 
-        // Sort users by XP in descending order
-        const sortedUsers = usersData.sort((a, b) => b.xp - a.xp);
-
-        // Format XP with commas (e.g., 28890 -> "28,890")
-        const formatXP = (xp) => xp.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        // Format XP with commas
+        const formatXP = (xp) => xp?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ",") || "0";
 
         // Assign ranks to all players
-        const rankedUsers = sortedUsers.map((player, index) => ({
+        const rankedUsers = usersData.map((player, index) => ({
           ...player,
           xp: `${formatXP(player.xp)} XP`,
-          rank: index + 1, // Assign rank based on position in the sorted list
+          rank: index + 1,
         }));
 
         // Top 3 players
@@ -43,15 +44,38 @@ const LeaderboardScreen = () => {
 
         setTopPlayers(topPlayers);
         setPlayers(otherPlayers);
+        setLoading(false);
       } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
+        console.error("Error processing snapshot:", error);
         setLoading(false);
       }
-    };
+    });
 
-    fetchUsers();
+    // Return the cleanup function
+    return () => {
+      unsubscribe(); // Call the unsubscribe function
+    };
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // The data will automatically update via the snapshot listener
+    setRefreshing(false);
+  };
+
+  const renderProfilePicture = (player) => {
+    if (player.profilePicBase64) {
+      return <Image source={{ uri: player.profilePicBase64 }} style={styles.avatar} />;
+    }
+    if (player.profilePic) {
+      return <Image source={{ uri: player.profilePic }} style={styles.avatar} />;
+    }
+    return (
+      <View style={styles.defaultAvatar}>
+        <FontAwesome name="user-circle" size={40} color="white" />
+      </View>
+    );
+  };
 
   if (loading) {
     return <ActivityIndicator size="large" color="white" style={{ flex: 1 }} />;
@@ -70,15 +94,8 @@ const LeaderboardScreen = () => {
         {topPlayers.map((player) => (
           <View key={player.id} style={styles.topCard}>
             <Text style={styles.positionText}>{player.position}</Text>
-            {/* Display profile picture or default icon */}
-            {player.profilePic ? (
-              <Image source={{ uri: player.profilePic }} style={styles.avatar} />
-            ) : (
-              <View style={styles.defaultAvatar}>
-                <FontAwesome name="user-circle" size={40} color="white" />
-              </View>
-            )}
-            <Text style={styles.playerName}>{player.name}</Text>
+            {renderProfilePicture(player)}
+            <Text style={styles.playerName}>{player.username || 'Anonymous'}</Text>
             <Text style={styles.xpText}>{player.xp}</Text>
           </View>
         ))}
@@ -90,39 +107,28 @@ const LeaderboardScreen = () => {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={[styles.playerRow, item.isYou && styles.highlighted]}>
-            {/* Rank */}
             <Text style={styles.rankText}>{item.rank}</Text>
-
-            {/* Profile Picture */}
-            {item.profilePic ? (
-              <Image source={{ uri: item.profilePic }} style={styles.avatar} />
-            ) : (
-              <View style={styles.defaultAvatar}>
-                <FontAwesome name="user-circle" size={40} color="white" />
-              </View>
-            )}
-
-            {/* Name and XP */}
+            {renderProfilePicture(item)}
             <View style={styles.playerInfo}>
-              <Text style={styles.playerName}>{item.name}</Text>
+              <Text style={styles.playerName}>{item.name || 'Anonymous'}</Text>
               <Text style={styles.xpText}>{item.xp}</Text>
             </View>
-
-            {/* Crown Icon for Current User */}
             {item.isYou && <FontAwesome name="crown" size={16} color="white" style={styles.crownIcon} />}
           </View>
         )}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
     </View>
   );
 };
 
-export default LeaderboardScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -134,8 +140,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 10,
   },
-
-  // Top Players
   topContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -179,8 +183,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
-
-  // Other Players List
   playerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -207,3 +209,5 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
 });
+
+export default LeaderboardScreen;

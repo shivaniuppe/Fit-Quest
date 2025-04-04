@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { ProgressBar } from "react-native-paper";
 
 const ProfileScreen = ({ navigation }) => {
@@ -10,15 +10,16 @@ const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      setLoading(false);
+      return;
+    }
 
-      const userRef = doc(db, "users", auth.currentUser.uid);
-
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    const unsubscribe = onSnapshot(userRef, (doc) => {
       try {
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setUserData(userSnap.data());
+        if (doc.exists()) {
+          setUserData(doc.data());
         } else {
           console.log("User data not found");
         }
@@ -27,9 +28,9 @@ const ProfileScreen = ({ navigation }) => {
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    fetchUserData();
+    return () => unsubscribe();
   }, []);
 
   if (loading) {
@@ -48,7 +49,6 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
-  // Destructure user data with default values
   const {
     username = "User",
     level = 1,
@@ -59,11 +59,13 @@ const ProfileScreen = ({ navigation }) => {
     workouts = 0,
     streak = 0,
     caloriesBurned = 0,
-    profilePic = "https://via.placeholder.com/100",
+    profilePic,         // Old field name (URL)
+    profilePicBase64, 
+    bio = "",
   } = userData;
 
-  // Calculate progress (ensure xpGoal is not zero)
-  const progress = xpGoal > 0 ? xp / xpGoal : 0;
+  const progress = xpGoal > 0 ? Math.min(xp / xpGoal, 1) : 0;
+  const profilePicture = profilePicBase64 || profilePic || null;
 
   const achievementData = [
     { title: "100 Workouts", icon: "🏅" },
@@ -76,7 +78,6 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
@@ -84,26 +85,35 @@ const ProfileScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Profile Section */}
       <View style={styles.profileContainer}>
         <View style={styles.profileImageContainer}>
-          <Image source={{ uri: profilePic }} style={styles.profileImage} />
+          {profilePicture ? (
+            <Image 
+              source={{ uri: profilePicture }} 
+              style={styles.profileImage} 
+            />
+          ) : (
+            <View style={[styles.profileImage, styles.profilePlaceholder]}>
+              <FontAwesome name="user-circle" size={50} color="#aaa" />
+            </View>
+          )}
           <View style={styles.levelBadge}>
             <Text style={styles.levelText}>Lvl {level}</Text>
           </View>
         </View>
         <Text style={styles.username}>{username}</Text>
         <Text style={styles.userTitle}>{title}</Text>
+        {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
       </View>
 
-      {/* XP Progress */}
       <View style={styles.xpContainer}>
         <Text style={styles.xpText}>XP Progress</Text>
-        <Text style={styles.xpValue}>{xp} / {xpGoal}</Text>
+        <Text style={styles.xpValue}>
+          {xp.toLocaleString()} / {xpGoal.toLocaleString()}
+        </Text>
       </View>
       <ProgressBar progress={progress} color="#4CAF50" style={styles.progressBar} />
 
-      {/* Achievements */}
       <Text style={styles.sectionTitle}>Achievements</Text>
       <FlatList
         data={achievementData}
@@ -117,7 +127,6 @@ const ProfileScreen = ({ navigation }) => {
         )}
       />
 
-      {/* Workout Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{workouts}</Text>
@@ -142,20 +151,35 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: "bold" },
   profileContainer: { alignItems: "center", marginBottom: 20 },
   profileImageContainer: { position: "relative", marginBottom: 10 },
-  profileImage: { width: 100, height: 100, borderRadius: 50, backgroundColor: "#ddd" },
-  levelBadge: { position: "absolute", bottom: 0, backgroundColor: "black", borderRadius: 12, padding: 5 },
+  profileImage: { width: 100, height: 100, borderRadius: 50 },
+  profilePlaceholder: { 
+    backgroundColor: "#f0f0f0", 
+    justifyContent: "center", 
+    alignItems: "center" 
+  },
+  levelBadge: { 
+    position: "absolute", 
+    bottom: 0, 
+    right: 0,
+    backgroundColor: "#4CAF50", 
+    borderRadius: 12, 
+    padding: 5,
+    minWidth: 40,
+    alignItems: "center"
+  },
   levelText: { color: "white", fontSize: 12, fontWeight: "bold" },
   username: { fontSize: 18, fontWeight: "bold", color: "black" },
-  userTitle: { fontSize: 14, color: "gray" },
+  userTitle: { fontSize: 14, color: "gray", marginBottom: 5 },
+  bioText: { fontSize: 14, color: "black", textAlign: "center", maxWidth: "80%" },
   xpContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   xpText: { fontSize: 14, color: "gray" },
   xpValue: { fontSize: 14, fontWeight: "bold", color: "black" },
   progressBar: { height: 8, borderRadius: 5, backgroundColor: "#ddd", marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10, color: "black" },
-  achievementItem: { flex: 1, alignItems: "center", marginBottom: 20 },
-  achievementIcon: { fontSize: 24 },
+  achievementItem: { flex: 1, alignItems: "center", marginBottom: 20, padding: 5 },
+  achievementIcon: { fontSize: 24, marginBottom: 5 },
   achievementText: { fontSize: 12, color: "gray", textAlign: "center" },
-  statsContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
+  statsContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, paddingHorizontal: 20 },
   statItem: { alignItems: "center", flex: 1 },
   statNumber: { fontSize: 18, fontWeight: "bold", color: "black" },
   statLabel: { fontSize: 12, color: "gray" },

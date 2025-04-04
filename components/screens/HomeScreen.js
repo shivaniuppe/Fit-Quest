@@ -6,12 +6,14 @@ import { Pedometer } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
-import { collection, getDoc, doc, onSnapshot, updateDoc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, getDoc, doc, onSnapshot, updateDoc, query, where, serverTimestamp, setDoc, getDocs, limit } from "firebase/firestore";
 import { auth, db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 import QuestsScreen from "./QuestsScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
 import ProfileScreen from "./ProfileScreen";
-import RunQuestScreen from "../QuestScreens/RunQuestScreen";
+import { FontAwesome5 } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { getWeatherData, getWeatherIcon, getWorkoutSuggestion } from '/Users/shivaniuppe/Desktop/Fit-Quest/components/utils/weatherService.js';
 
 const MainHomeScreen = () => {
   const [steps, setSteps] = useState(0);
@@ -21,40 +23,201 @@ const MainHomeScreen = () => {
   const navigation = useNavigation();
   const user = auth.currentUser;
   const stepsGoal = 10000;
+  const [weather, setWeather] = useState({
+    temp: '--',
+    condition: 'Loading...',
+    suggestion: 'Fetching weather...',
+    icon: 'cloud'
+  });
+  const [suggestedQuest, setSuggestedQuest] = useState(null);
+  const [loadingQuest, setLoadingQuest] = useState(false);
 
   // Function to load steps and reset if it's a new day
   const loadSteps = async () => {
-    const today = new Date().toLocaleDateString(); // Get today's date as a string
+    const today = new Date().toLocaleDateString();
     const lastResetDate = await AsyncStorage.getItem("lastResetDate");
     const storedSteps = await AsyncStorage.getItem("stepsToday");
 
     if (lastResetDate !== today) {
-      // If the last reset date is not today, reset the steps
       await AsyncStorage.setItem("stepsToday", "0");
       await AsyncStorage.setItem("lastResetDate", today);
       setSteps(0);
     } else if (storedSteps) {
-      // If the last reset date is today, load the stored steps
       setSteps(parseInt(storedSteps));
     }
   };
 
   useEffect(() => {
-    loadSteps(); // Load steps and reset if necessary
-
-    // Watch for step count changes
+    loadSteps();
     const subscribe = Pedometer.watchStepCount((result) => {
       setSteps(result.steps);
       AsyncStorage.setItem("stepsToday", result.steps.toString());
     });
-
-    return () => subscribe.remove(); // Cleanup subscription
+    return () => subscribe.remove();
   }, []);
+
+  useEffect(() => {
+    fetchWeatherAndQuest();
+  }, []);
+
+  const getNewSuggestedQuest = async () => {
+    try {
+      if (!weather.condition || weather.condition === 'Loading...') return undefined;
+  
+      // Get weather suggestion (this determines outdoor/indoor)
+      const suggestion = getWorkoutSuggestion({
+        main: weather.condition,
+        temp: weather.temp
+      });
+      console.log('Current weather suggestion:', suggestion);
+  
+      // First check if user exists in userQuests collection
+      const userQuestRef = collection(db, "userQuests");
+      const userQuestQuery = query(userQuestRef, where("userId", "==", user.uid));
+      const userQuestSnapshot = await getDocs(userQuestQuery);
+      
+      // For new users (no documents in userQuests)
+      if (userQuestSnapshot.empty) {
+        const q = query(
+          collection(db, "quests"),
+          where("status", "==", "active"),
+          where("environment", "in", [suggestion.environment, 'Any']), // STRICT FILTER
+          limit(10)
+        );
+        const querySnapshot = await getDocs(q);
+        const availableQuests = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        if (availableQuests.length > 0) {
+          return availableQuests[Math.floor(Math.random() * availableQuests.length)];
+        }
+        return null;
+      }
+  
+      // Existing logic for non-new users
+      const completedQuestIds = userQuestSnapshot.docs.map(doc => doc.data().questId);
+      
+      const q = query(
+        collection(db, "quests"),
+        where("status", "==", "active"),
+        where("environment", "in", [suggestion.environment, 'Any']), // STRICT FILTER
+        limit(20)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const availableQuests = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(quest => !completedQuestIds.includes(quest.id));
+  
+      if (availableQuests.length > 0) {
+        return availableQuests[Math.floor(Math.random() * availableQuests.length)];
+      }
+      return null;
+  
+    } catch (error) {
+      console.error("Error in getNewSuggestedQuest:", error);
+      return null;
+    }
+  };
+
+  const fetchWeatherAndQuest = async () => {
+    try {
+      setLoadingQuest(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setWeather({
+          ...weather,
+          condition: 'Location denied',
+          suggestion: 'Enable location for weather'
+        });
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const weatherData = await getWeatherData(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+
+      if (weatherData) {
+        const iconCode = weatherData.weather[0].icon;
+        const temp = Math.round(weatherData.main.temp);
+        const condition = weatherData.weather[0].main;
+        
+        const suggestion = getWorkoutSuggestion({
+          main: condition,
+          temp: temp
+        });
+
+        setWeather({
+          temp: temp,
+          condition: condition,
+          icon: getWeatherIcon(iconCode),
+          suggestion: suggestion.suggestion,
+          environment: suggestion.environment
+        });
+
+        // Get new suggested quest after weather is set
+        const newSuggestedQuest = await getNewSuggestedQuest();
+        setSuggestedQuest(newSuggestedQuest);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setWeather({
+        temp: '--',
+        condition: 'Error',
+        suggestion: 'Check connection',
+        icon: 'exclamation-triangle'
+      });
+    } finally {
+      setLoadingQuest(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeatherAndQuest();
+  }, [acceptedQuests]);
+
+  const handleAcceptSuggestedQuest = async () => {
+    if (!user || !suggestedQuest) return;
+
+    try {
+      const userQuestRef = doc(db, "userQuests", `${user.uid}_${suggestedQuest.id}`);
+      const questDoc = await getDoc(userQuestRef);
+      
+      if (questDoc.exists()) {
+        alert("You've already accepted this quest!");
+        return;
+      }
+      
+      await setDoc(userQuestRef, {
+        userId: user.uid,
+        questId: suggestedQuest.id,
+        status: "accepted",
+        progress: 0,
+        acceptedAt: serverTimestamp()
+      });
+      
+      alert(`Quest "${suggestedQuest.title}" accepted!`);
+      
+      // Get a new suggested quest
+      const newSuggestedQuest = await getNewSuggestedQuest();
+      setSuggestedQuest(newSuggestedQuest);
+      
+    } catch (error) {
+      console.error("Error accepting quest:", error);
+      alert("Failed to accept quest. Please try again.");
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
   
-    // Fetch accepted quests from the userQuests collection
     const userQuestsRef = collection(db, "userQuests");
     const userQuestsQuery = query(
       userQuestsRef, 
@@ -64,7 +227,7 @@ const MainHomeScreen = () => {
   
     const unsubscribe = onSnapshot(userQuestsQuery, async (querySnapshot) => {
       if (querySnapshot.empty) {
-        setAcceptedQuests([]); // No quests found
+        setAcceptedQuests([]);
         setLoading(false);
         return;
       }
@@ -79,10 +242,10 @@ const MainHomeScreen = () => {
   
           if (questDocSnap.exists()) {
             return {
-              ...questDocSnap.data(), // Quest details from the quests collection
-              id: questId, // Quest ID
-              status: questData.status, // Status from the userQuests collection
-              progress: questData.progress || 0, // Progress from the userQuests collection
+              ...questDocSnap.data(),
+              id: questId,
+              status: questData.status,
+              progress: questData.progress || 0,
             };
           }
         } catch (error) {
@@ -91,9 +254,7 @@ const MainHomeScreen = () => {
         return null;
       });
   
-      // Wait for all promises to resolve
       const acceptedQuestsData = (await Promise.all(fetchQuests)).filter(Boolean);
-  
       setAcceptedQuests(acceptedQuestsData);
       setLoading(false);
     });
@@ -107,73 +268,85 @@ const MainHomeScreen = () => {
 
   const handleStartQuest = async (questId) => {
     if (!auth.currentUser) return;
-
+  
     const userId = auth.currentUser.uid;
     const userQuestRef = doc(db, "userQuests", `${userId}_${questId}`);
-
+  
     try {
       await updateDoc(userQuestRef, { status: "in-progress" });
-
-      // Update local state
       setAcceptedQuests((prevQuests) =>
         prevQuests.map((quest) =>
           quest.id === questId ? { ...quest, status: "in-progress" } : quest
         )
       );
-
-      // Find the quest details
+  
       const quest = acceptedQuests.find((q) => q.id === questId);
       if (quest) {
-        // Navigate to RunQuestScreen with quest data
-        navigation.navigate("RunQuestScreen", { quest });
+        // ✅ Dynamic navigation based on activityType
+        switch (quest.activityType) {
+          case "Active":
+            navigation.navigate("RunQuestScreen", { quest });
+            break;
+          case "Reps":
+            navigation.navigate("RepsQuestScreen", { quest });
+            break;
+          case "Timed":
+            navigation.navigate("TimedQuestScreen", { quest });
+            break;
+          case "Wellness":
+            navigation.navigate("WellnessQuestScreen", { quest });
+            break;
+          default:
+            alert("Unknown quest type.");
+        }
       }
     } catch (error) {
       console.error("Error starting quest:", error);
     }
   };
+  
 
   const handleCompleteQuest = async (questId) => {
     if (!auth.currentUser) return;
-
+  
     const userId = auth.currentUser.uid;
     const userQuestRef = doc(db, "userQuests", `${userId}_${questId}`);
-
+  
     try {
-      // Update the quest status to "completed"
       await updateDoc(userQuestRef, { 
         status: "completed",
-        completedAt: serverTimestamp() // This ensures Firestore assigns the correct timestamp
+        completedAt: serverTimestamp()
       });
       
-
-      // Fetch the quest details to calculate XP
       const questDocRef = doc(db, "quests", questId);
       const questDoc = await getDoc(questDocRef);
-
+  
       if (questDoc.exists()) {
         const questData = questDoc.data();
         const xpEarned = questData.xp;
-
-        // Update the user's XP and level in the users collection
+  
         const userRef = doc(db, "users", userId);
         const userSnap = await getDoc(userRef);
-
+  
         if (userSnap.exists()) {
           const userData = userSnap.data();
           const newXP = (userData.xp || 0) + xpEarned;
-          const newLevel = Math.floor(newXP / 100) + 1; // Each level requires 100 XP
-
+          const newLevel = Math.floor(newXP / 100) + 1;
+  
           await updateDoc(userRef, {
             xp: newXP,
             level: newLevel,
           });
-
-          // Update local state
+  
           setLevel(newLevel);
           setAcceptedQuests((prevQuests) =>
             prevQuests.filter((quest) => quest.id !== questId)
           );
-
+  
+          // Refresh the suggested quest after completion
+          const newSuggestedQuest = await getNewSuggestedQuest();
+          setSuggestedQuest(newSuggestedQuest);
+  
           alert("Quest completed! You gained " + xpEarned + " XP.");
         }
       }
@@ -181,30 +354,102 @@ const MainHomeScreen = () => {
       console.error("Error completing quest:", error);
     }
   };
+  
 
   return (
     <View style={styles.container}>
-      <View style={styles.levelContainer}>
-        <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.levelText}>Level {level} ⭐</Text>
-          <Progress.Bar progress={level / 100} width={150} color="black" unfilledColor="#E5E5E5" borderWidth={0} />
+      {/* Top Bar with Level and Settings */}
+      <View style={styles.topBar}>
+        <View style={styles.levelContainer}>
+          <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
+          <View style={styles.levelProgress}>
+            <Text style={styles.levelText}>Level {level} ⭐</Text>
+            <Progress.Bar 
+              progress={level / 100} 
+              width={150} 
+              height={8}
+              color="#4CAF50" 
+              unfilledColor="#E5E5E5" 
+              borderWidth={0} 
+            />
+          </View>
         </View>
-        <TouchableOpacity>
+        <TouchableOpacity style={styles.settingsButton}>
           <Ionicons name="settings-outline" size={24} color="black" />
         </TouchableOpacity>
       </View>
 
+      {/* Steps Progress */}
       <View style={styles.stepsContainer}>
         <Text style={styles.stepsText}>Steps Today</Text>
-        <Progress.Bar progress={steps / stepsGoal} width={250} color="black" unfilledColor="#E5E5E5" borderWidth={0} />
+        <Progress.Bar 
+          progress={steps / stepsGoal} 
+          width={null} 
+          height={10}
+          color="#2196F3" 
+          unfilledColor="#E5E5E5" 
+          borderWidth={0} 
+        />
         <Text style={styles.stepsCount}>{steps} / {stepsGoal} steps</Text>
       </View>
 
+      {/* Combined Weather and Suggested Quest Card */}
+      <View style={styles.weatherQuestCard}>
+        {/* Weather Section */}
+        <View style={styles.weatherSection}>
+          <FontAwesome5 
+            name={weather.icon} 
+            size={20} 
+            color="#FFA500" 
+          />
+          <View style={styles.weatherTextContainer}>
+            <Text style={styles.weatherTemp}>{weather.temp}°C • {weather.condition}</Text>
+            <Text style={styles.weatherSuggestionText}>{weather.suggestion}</Text>
+          </View>
+        </View>
+
+        {/* Suggested Quest Section */}
+        {loadingQuest ? (
+          <ActivityIndicator size="small" color="#000" style={styles.loadingIndicator} />
+        ) : suggestedQuest ? (
+          <View style={styles.suggestedQuestSection}>
+            <Text style={styles.sectionTitle}>Suggested for Today</Text>
+            <View style={styles.questPreview}>
+              <View style={styles.questPreviewHeader}>
+                <FontAwesome5 
+                  name={suggestedQuest.icon} 
+                  size={16} 
+                  color="#FFA500"
+                  style={styles.questIcon}
+                />
+                <Text style={styles.questPreviewTitle} numberOfLines={1}>{suggestedQuest.title}</Text>
+                <View style={styles.xpBadge}>
+                  <Text style={styles.xpText}>+{suggestedQuest.xp} XP</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.acceptButton}
+                onPress={handleAcceptSuggestedQuest}
+              >
+                <Text style={styles.buttonText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.noQuestText}>
+            {weather.environment === 'Outdoor' 
+              ? 'No outdoor quests available right now'
+              : 'No indoor quests available right now'}
+          </Text>
+        )}
+      </View>
+
+      {/* Accepted Quests List */}
       {acceptedQuests.length > 0 ? (
         <FlatList
           data={acceptedQuests}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.questsList}
           renderItem={({ item }) => (
             <View style={styles.questCard}>
               <View style={styles.questHeader}>
@@ -213,25 +458,30 @@ const MainHomeScreen = () => {
                   <Text style={styles.xpText}>+{item.xp} XP</Text>
                 </View>
               </View>
-              <Text style={styles.questDesc}>{item.description}</Text>
-              <Progress.Bar progress={item.progress} width={250} color="black" unfilledColor="#E5E5E5" borderWidth={0} />
-              <Text style={styles.questValue}>{item.progress * 100}%</Text>
+              <Progress.Bar 
+                progress={item.progress} 
+                width={null} 
+                height={6}
+                color="#4CAF50" 
+                unfilledColor="#E5E5E5" 
+                borderWidth={0} 
+              />
+              <Text style={styles.questValue}>{Math.round(item.progress * 100)}%</Text>
 
-              {/* Buttons for Start Quest and Mark as Completed */}
               <View style={styles.buttonsContainer}>
                 {item.status === "accepted" ? (
                   <TouchableOpacity
                     style={styles.startButton}
                     onPress={() => handleStartQuest(item.id)}
                   >
-                    <Text style={styles.buttonText}>Start Quest</Text>
+                    <Text style={styles.buttonText}>Start</Text>
                   </TouchableOpacity>
                 ) : item.status === "in-progress" ? (
                   <TouchableOpacity
                     style={styles.completeButton}
                     onPress={() => handleCompleteQuest(item.id)}
                   >
-                    <Text style={styles.buttonText}>Mark as Completed</Text>
+                    <Text style={styles.buttonText}>Complete</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -242,13 +492,14 @@ const MainHomeScreen = () => {
         <View style={styles.noQuestsContainer}>
           <Text style={styles.noQuestsText}>No quests accepted yet.</Text>
           <TouchableOpacity style={styles.questButton} onPress={() => navigation.navigate("Quests")}>
-            <Text style={styles.questButtonText}>Check Quests</Text>
+            <Text style={styles.questButtonText}>Browse Quests</Text>
           </TouchableOpacity>
         </View>
       )}
     </View>
   );
 };
+
 
 const Tab = createBottomTabNavigator();
 
@@ -266,80 +517,215 @@ const HomeScreen = () => {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white", padding: 20 },
-  levelContainer: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  levelText: { fontSize: 18, fontWeight: "bold" },
-  stepsContainer: { alignItems: "center", marginBottom: 20 },
-  stepsText: { fontSize: 16, fontWeight: "bold" },
-  stepsCount: { fontSize: 14, color: "gray" },
-  tabBar: { backgroundColor: "white", borderTopColor: "#E5E5E5", borderTopWidth: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "white", 
+    padding: 16 
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  levelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    marginRight: 12 
+  },
+  levelProgress: {
+    flex: 1,
+  },
+  levelText: { 
+    fontSize: 16, 
+    fontWeight: "bold",
+    marginBottom: 4
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  stepsContainer: { 
+    marginBottom: 20,
+  },
+  stepsText: { 
+    fontSize: 14, 
+    fontWeight: "600",
+    marginBottom: 6,
+    color: '#555'
+  },
+  stepsCount: { 
+    fontSize: 12, 
+    color: "#777",
+    marginTop: 4,
+    alignSelf: 'flex-end'
+  },
+  weatherQuestCard: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  weatherSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  weatherTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  weatherTemp: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  weatherSuggestionText: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  suggestedQuestSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    paddingTop: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 8,
+  },
+  questPreview: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+  },
+  questPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  questPreviewTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  questIcon: {
+    marginRight: 8,
+  },
+  xpBadge: { 
+    backgroundColor: "#333", 
+    paddingVertical: 3, 
+    paddingHorizontal: 8, 
+    borderRadius: 12 
+  },
+  xpText: { 
+    color: "white", 
+    fontSize: 11, 
+    fontWeight: "bold" 
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+    padding: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  noQuestText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 13,
+    marginVertical: 8,
+  },
+  questsList: {
+    paddingBottom: 20,
+  },
   questCard: {
     backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 15,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   questHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 8,
   },
-  questTitle: { fontSize: 16, fontWeight: "bold" },
-  questDesc: { fontSize: 14, color: "gray", marginBottom: 10 },
-  questValue: { fontSize: 12, color: "gray", marginTop: 5 },
-  xpBadge: { backgroundColor: "black", paddingVertical: 5, paddingHorizontal: 10, borderRadius: 15 },
-  xpText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  questTitle: { 
+    fontSize: 14, 
+    fontWeight: "500",
+    flex: 1,
+    marginRight: 8,
+  },
+  questValue: { 
+    fontSize: 11, 
+    color: "#777", 
+    marginTop: 4,
+    alignSelf: 'flex-end'
+  },
   buttonsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10,
   },
   startButton: {
-    backgroundColor: "#4CAF50", // Green color for Start Quest
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: "#4CAF50",
+    padding: 8,
+    borderRadius: 6,
     flex: 1,
-    marginRight: 5,
+    marginRight: 6,
   },
   completeButton: {
-    backgroundColor: "#FF5722", // Orange color for Mark as Completed
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: "#FF5722",
+    padding: 8,
+    borderRadius: 6,
     flex: 1,
-    marginLeft: 5,
+    marginLeft: 6,
   },
   buttonText: {
     color: "white",
-    fontSize: 14,
-    fontWeight: "bold",
+    fontSize: 13,
+    fontWeight: "500",
     textAlign: "center",
   },
   noQuestsContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 20,
   },
   noQuestsText: {
-    fontSize: 16,
-    color: "gray",
-    marginBottom: 20,
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 16,
   },
   questButton: {
-    backgroundColor: "black",
-    padding: 15,
-    borderRadius: 10,
-    width: "100%",
+    backgroundColor: "#333",
+    padding: 12,
+    borderRadius: 8,
+    width: "70%",
     alignItems: "center",
   },
   questButtonText: {
     color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 14,
+    fontWeight: "500",
   },
+  loadingIndicator: {
+    marginVertical: 8
+  }
 });
+
+
+
