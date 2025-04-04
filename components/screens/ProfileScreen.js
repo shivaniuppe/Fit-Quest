@@ -81,7 +81,7 @@ const ProfileScreen = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
-          <Ionicons name="settings-outline" size={24} color="black" />
+          <Ionicons name="settings-outline" size={24} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -146,14 +146,37 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white", padding: 20 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  headerTitle: { fontSize: 22, fontWeight: "bold" },
-  profileContainer: { alignItems: "center", marginBottom: 20 },
-  profileImageContainer: { position: "relative", marginBottom: 10 },
-  profileImage: { width: 100, height: 100, borderRadius: 50 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#121212", 
+    padding: 20 
+  },
+  header: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  headerTitle: { 
+    fontSize: 22, 
+    fontWeight: "bold", 
+    color: "#FFFFFF" 
+  },
+  profileContainer: { 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  profileImageContainer: { 
+    position: "relative", 
+    marginBottom: 10 
+  },
+  profileImage: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50 
+  },
   profilePlaceholder: { 
-    backgroundColor: "#f0f0f0", 
+    backgroundColor: "#333", 
     justifyContent: "center", 
     alignItems: "center" 
   },
@@ -167,22 +190,88 @@ const styles = StyleSheet.create({
     minWidth: 40,
     alignItems: "center"
   },
-  levelText: { color: "white", fontSize: 12, fontWeight: "bold" },
-  username: { fontSize: 18, fontWeight: "bold", color: "black" },
-  userTitle: { fontSize: 14, color: "gray", marginBottom: 5 },
-  bioText: { fontSize: 14, color: "black", textAlign: "center", maxWidth: "80%" },
-  xpContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  xpText: { fontSize: 14, color: "gray" },
-  xpValue: { fontSize: 14, fontWeight: "bold", color: "black" },
-  progressBar: { height: 8, borderRadius: 5, backgroundColor: "#ddd", marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10, color: "black" },
-  achievementItem: { flex: 1, alignItems: "center", marginBottom: 20, padding: 5 },
-  achievementIcon: { fontSize: 24, marginBottom: 5 },
-  achievementText: { fontSize: 12, color: "gray", textAlign: "center" },
-  statsContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, paddingHorizontal: 20 },
-  statItem: { alignItems: "center", flex: 1 },
-  statNumber: { fontSize: 18, fontWeight: "bold", color: "black" },
-  statLabel: { fontSize: 12, color: "gray" },
+  levelText: { 
+    color: "white", 
+    fontSize: 12, 
+    fontWeight: "bold" 
+  },
+  username: { 
+    fontSize: 18, 
+    fontWeight: "bold", 
+    color: "#FFFFFF" 
+  },
+  userTitle: { 
+    fontSize: 14, 
+    color: "#AAAAAA", 
+    marginBottom: 5 
+  },
+  bioText: { 
+    fontSize: 14, 
+    color: "#DDDDDD", 
+    textAlign: "center", 
+    maxWidth: "80%" 
+  },
+  xpContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginBottom: 10 
+  },
+  xpText: { 
+    fontSize: 14, 
+    color: "#BBBBBB" 
+  },
+  xpValue: { 
+    fontSize: 14, 
+    fontWeight: "bold", 
+    color: "#FFFFFF" 
+  },
+  progressBar: { 
+    height: 8, 
+    borderRadius: 5, 
+    backgroundColor: "#333", 
+    marginBottom: 20 
+  },
+  sectionTitle: { 
+    fontSize: 16, 
+    fontWeight: "bold", 
+    marginBottom: 10, 
+    color: "#FFFFFF" 
+  },
+  achievementItem: { 
+    flex: 1, 
+    alignItems: "center", 
+    marginBottom: 20, 
+    padding: 5 
+  },
+  achievementIcon: { 
+    fontSize: 24, 
+    marginBottom: 5 
+  },
+  achievementText: { 
+    fontSize: 12, 
+    color: "#BBBBBB", 
+    textAlign: "center" 
+  },
+  statsContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginTop: 20, 
+    paddingHorizontal: 20 
+  },
+  statItem: { 
+    alignItems: "center", 
+    flex: 1 
+  },
+  statNumber: { 
+    fontSize: 18, 
+    fontWeight: "bold", 
+    color: "#FFFFFF" 
+  },
+  statLabel: { 
+    fontSize: 12, 
+    color: "#BBBBBB" 
+  },
 });
+
 
 export default ProfileScreen;

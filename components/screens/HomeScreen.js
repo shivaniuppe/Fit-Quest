@@ -60,31 +60,33 @@ const MainHomeScreen = () => {
   }, []);
 
   useEffect(() => {
-    fetchWeatherAndQuest();
-  }, []);
+    if (auth.currentUser) {
+      fetchWeatherAndQuest();
+    }
+  }, [auth.currentUser]);
+  
+  
 
-  const getNewSuggestedQuest = async () => {
+  const getNewSuggestedQuest = async (currentWeather) => {
     try {
-      if (!weather.condition || weather.condition === 'Loading...') return undefined;
+      if (!auth.currentUser || !currentWeather || !currentWeather.condition) return null;
   
-      // Get weather suggestion (this determines outdoor/indoor)
       const suggestion = getWorkoutSuggestion({
-        main: weather.condition,
-        temp: weather.temp
+        main: currentWeather.condition,
+        temp: currentWeather.temp,
       });
-      console.log('Current weather suggestion:', suggestion);
   
-      // First check if user exists in userQuests collection
+      console.log('Getting quests for environment:', suggestion.environment);
+  
       const userQuestRef = collection(db, "userQuests");
-      const userQuestQuery = query(userQuestRef, where("userId", "==", user.uid));
+      const userQuestQuery = query(userQuestRef, where("userId", "==", auth.currentUser.uid));
       const userQuestSnapshot = await getDocs(userQuestQuery);
-      
-      // For new users (no documents in userQuests)
+  
       if (userQuestSnapshot.empty) {
         const q = query(
           collection(db, "quests"),
           where("status", "==", "active"),
-          where("environment", "in", [suggestion.environment, 'Any']), // STRICT FILTER
+          where("environment", "in", [suggestion.environment, 'Any']),
           limit(10)
         );
         const querySnapshot = await getDocs(q);
@@ -92,23 +94,21 @@ const MainHomeScreen = () => {
           id: doc.id,
           ...doc.data()
         }));
-        
-        if (availableQuests.length > 0) {
-          return availableQuests[Math.floor(Math.random() * availableQuests.length)];
-        }
-        return null;
+  
+        return availableQuests.length > 0
+          ? availableQuests[Math.floor(Math.random() * availableQuests.length)]
+          : null;
       }
   
-      // Existing logic for non-new users
       const completedQuestIds = userQuestSnapshot.docs.map(doc => doc.data().questId);
-      
+  
       const q = query(
         collection(db, "quests"),
         where("status", "==", "active"),
-        where("environment", "in", [suggestion.environment, 'Any']), // STRICT FILTER
+        where("environment", "in", [suggestion.environment, 'Any']),
         limit(20)
       );
-      
+  
       const querySnapshot = await getDocs(q);
       const availableQuests = querySnapshot.docs
         .map(doc => ({
@@ -117,75 +117,78 @@ const MainHomeScreen = () => {
         }))
         .filter(quest => !completedQuestIds.includes(quest.id));
   
-      if (availableQuests.length > 0) {
-        return availableQuests[Math.floor(Math.random() * availableQuests.length)];
-      }
-      return null;
+      return availableQuests.length > 0
+        ? availableQuests[Math.floor(Math.random() * availableQuests.length)]
+        : null;
   
     } catch (error) {
       console.error("Error in getNewSuggestedQuest:", error);
       return null;
     }
   };
+  
 
   const fetchWeatherAndQuest = async () => {
     try {
       setLoadingQuest(true);
+  
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setWeather({
           ...weather,
           condition: 'Location denied',
-          suggestion: 'Enable location for weather'
+          suggestion: 'Enable location for weather',
         });
         return;
       }
-
-      let location = await Location.getCurrentPositionAsync({});
+  
+      const location = await Location.getCurrentPositionAsync({});
       const weatherData = await getWeatherData(
         location.coords.latitude,
         location.coords.longitude
       );
-
+  
       if (weatherData) {
         const iconCode = weatherData.weather[0].icon;
         const temp = Math.round(weatherData.main.temp);
         const condition = weatherData.weather[0].main;
-        
+  
         const suggestion = getWorkoutSuggestion({
           main: condition,
-          temp: temp
+          temp: temp,
         });
-
-        setWeather({
+  
+        const updatedWeather = {
           temp: temp,
           condition: condition,
           icon: getWeatherIcon(iconCode),
           suggestion: suggestion.suggestion,
-          environment: suggestion.environment
-        });
-
-        // Get new suggested quest after weather is set
-        const newSuggestedQuest = await getNewSuggestedQuest();
-        setSuggestedQuest(newSuggestedQuest);
+          environment: suggestion.environment,
+        };
+  
+        setWeather(updatedWeather);
+  
+        // 👇 Call this after weather AND user are both ready
+        if (auth.currentUser) {
+          const newSuggestedQuest = await getNewSuggestedQuest(updatedWeather);
+          setSuggestedQuest(newSuggestedQuest);
+        }
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error in fetchWeatherAndQuest:", error);
       setWeather({
         temp: '--',
         condition: 'Error',
         suggestion: 'Check connection',
-        icon: 'exclamation-triangle'
+        icon: 'exclamation-triangle',
       });
     } finally {
       setLoadingQuest(false);
     }
   };
+  
 
-  useEffect(() => {
-    fetchWeatherAndQuest();
-  }, [acceptedQuests]);
-
+ 
   const handleAcceptSuggestedQuest = async () => {
     if (!user || !suggestedQuest) return;
 
@@ -209,14 +212,26 @@ const MainHomeScreen = () => {
       alert(`Quest "${suggestedQuest.title}" accepted!`);
       
       // Get a new suggested quest
-      const newSuggestedQuest = await getNewSuggestedQuest();
+      const newSuggestedQuest = await getNewSuggestedQuest(weather);
       setSuggestedQuest(newSuggestedQuest);
+
       
     } catch (error) {
       console.error("Error accepting quest:", error);
       alert("Failed to accept quest. Please try again.");
     }
   };
+  const handleIgnoreSuggestedQuest = async () => {
+    if (!weather) return;
+  
+    const newSuggestedQuest = await getNewSuggestedQuest(weather);
+    if (newSuggestedQuest) {
+      setSuggestedQuest(newSuggestedQuest);
+    } else {
+      alert("No other quests available at the moment.");
+    }
+  };
+  
 
   useEffect(() => {
     if (!user) return;
@@ -347,7 +362,7 @@ const MainHomeScreen = () => {
           );
   
           // Refresh the suggested quest after completion
-          const newSuggestedQuest = await getNewSuggestedQuest();
+          const newSuggestedQuest = await getNewSuggestedQuest(weather);
           setSuggestedQuest(newSuggestedQuest);
   
           alert("Quest completed! You gained " + xpEarned + " XP.");
@@ -394,7 +409,7 @@ const MainHomeScreen = () => {
               width={150} 
               height={8}
               color="#4CAF50" 
-              unfilledColor="#E5E5E5" 
+              unfilledColor="#333"
               borderWidth={0} 
             />
           </View>
@@ -412,7 +427,7 @@ const MainHomeScreen = () => {
           width={null} 
           height={10}
           color="#2196F3" 
-          unfilledColor="#E5E5E5" 
+          unfilledColor="#333"
           borderWidth={0} 
         />
         <Text style={styles.stepsCount}>{steps} / {stepsGoal} steps</Text>
@@ -452,12 +467,22 @@ const MainHomeScreen = () => {
                   <Text style={styles.xpText}>+{suggestedQuest.xp} XP</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                style={styles.acceptButton}
-                onPress={handleAcceptSuggestedQuest}
-              >
-                <Text style={styles.buttonText}>Accept</Text>
-              </TouchableOpacity>
+              <View style={styles.suggestedButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.acceptButton}
+                  onPress={handleAcceptSuggestedQuest}
+                >
+                  <Text style={styles.buttonText}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.ignoreButton}
+                  onPress={handleIgnoreSuggestedQuest}
+                >
+                  <Text style={styles.buttonText}>Ignore</Text>
+                </TouchableOpacity>
+              </View>
+
+
             </View>
           </View>
         ) : (
@@ -488,7 +513,7 @@ const MainHomeScreen = () => {
                 width={null} 
                 height={6}
                 color="#4CAF50" 
-                unfilledColor="#E5E5E5" 
+                unfilledColor="#333"
                 borderWidth={0} 
               />
               <Text style={styles.questValue}>{Math.round(item.progress * 100)}%</Text>
@@ -583,7 +608,17 @@ const Tab = createBottomTabNavigator();
 
 const HomeScreen = () => {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarStyle: styles.tabBar }}>
+        <Tab.Navigator
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: {
+              backgroundColor: "#1E1E1E", // Dark background
+              borderTopColor: "#333",     // Optional: subtle border
+            },
+            tabBarActiveTintColor: "#4CAF50", // Active tab icon/text color
+            tabBarInactiveTintColor: "#CCCCCC", // Inactive tab icon/text
+          }}
+        >
       <Tab.Screen name="Dashboard" component={MainHomeScreen} options={{ tabBarIcon: ({ color }) => <FontAwesome name="home" size={24} color={color} /> }} />
       <Tab.Screen name="Quests" component={QuestsScreen} options={{ tabBarIcon: ({ color }) => <Ionicons name="list-outline" size={24} color={color} /> }} />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} options={{ tabBarIcon: ({ color }) => <FontAwesome name="trophy" size={24} color={color} /> }} />
@@ -597,7 +632,7 @@ export default HomeScreen;
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "white", 
+    backgroundColor: "#121212", 
     padding: 16 
   },
   topBar: {
@@ -622,7 +657,8 @@ const styles = StyleSheet.create({
   levelText: { 
     fontSize: 16, 
     fontWeight: "bold",
-    marginBottom: 4
+    marginBottom: 4,
+    color: "#FFFFFF"
   },
   settingsButton: {
     padding: 8,
@@ -634,16 +670,16 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     fontWeight: "600",
     marginBottom: 6,
-    color: '#555'
+    color: '#AAAAAA'
   },
   stepsCount: { 
     fontSize: 12, 
-    color: "#777",
+    color: "#CCCCCC",
     marginTop: 4,
     alignSelf: 'flex-end'
   },
   weatherQuestCard: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: '#1E1E1E',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
@@ -660,26 +696,26 @@ const styles = StyleSheet.create({
   weatherTemp: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
   },
   weatherSuggestionText: {
     fontSize: 13,
-    color: '#666',
+    color: '#CCCCCC',
     marginTop: 2,
   },
   suggestedQuestSection: {
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#2C2C2C',
     paddingTop: 12,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#555',
+    color: '#CCCCCC',
     marginBottom: 8,
   },
   questPreview: {
-    backgroundColor: 'white',
+    backgroundColor: '#2A2A2A',
     borderRadius: 8,
     padding: 12,
   },
@@ -693,12 +729,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     marginHorizontal: 8,
+    color: "#FFFFFF"
   },
   questIcon: {
     marginRight: 8,
   },
   xpBadge: { 
-    backgroundColor: "#333", 
+    backgroundColor: "#444", 
     paddingVertical: 3, 
     paddingHorizontal: 8, 
     borderRadius: 12 
@@ -708,15 +745,28 @@ const styles = StyleSheet.create({
     fontSize: 11, 
     fontWeight: "bold" 
   },
+  suggestedButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
   acceptButton: {
     backgroundColor: '#4CAF50',
     padding: 8,
     borderRadius: 6,
-    alignItems: 'center',
+    flex: 1,
+    marginRight: 6,
+  },
+  ignoreButton: {
+    backgroundColor: '#757575',
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginLeft: 6,
   },
   noQuestText: {
     textAlign: 'center',
-    color: '#666',
+    color: '#888888',
     fontSize: 13,
     marginVertical: 8,
   },
@@ -724,7 +774,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   questCard: {
-    backgroundColor: "white",
+    backgroundColor: "#1C1C1C",
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
@@ -745,10 +795,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flex: 1,
     marginRight: 8,
+    color: "#FFFFFF"
   },
   questValue: { 
     fontSize: 11, 
-    color: "#777", 
+    color: "#AAAAAA", 
     marginTop: 4,
     alignSelf: 'flex-end'
   },
@@ -771,6 +822,20 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 6,
   },
+  resumeButton: {
+    backgroundColor: "#FFA000",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginRight: 6,
+  },
+  abandonButton: {
+    backgroundColor: "#616161",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginLeft: 6,
+  },
   buttonText: {
     color: "white",
     fontSize: 13,
@@ -785,7 +850,7 @@ const styles = StyleSheet.create({
   },
   noQuestsText: {
     fontSize: 14,
-    color: "#666",
+    color: "#AAAAAA",
     marginBottom: 16,
   },
   questButton: {
@@ -803,40 +868,19 @@ const styles = StyleSheet.create({
   loadingIndicator: {
     marginVertical: 8
   },
-  resumeButton: {
-    backgroundColor: "#FFA000",
-    padding: 8,
-    borderRadius: 6,
-    flex: 1,
-    marginRight: 6,
-  }, 
-  resumeButton: {
-    backgroundColor: "#FFA000",
-    padding: 8,
-    borderRadius: 6,
-    flex: 1,
-    marginRight: 6,
-  },
-  abandonButton: {
-    backgroundColor: "#9E9E9E",
-    padding: 8,
-    borderRadius: 6,
-    flex: 1,
-    marginLeft: 6,
-  },
   modalOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
   },
   modalBox: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1E1E",
     borderRadius: 12,
     padding: 20,
     width: "80%",
@@ -847,6 +891,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginBottom: 20,
     textAlign: "center",
+    color: "#FFFFFF"
   },
   modalButtons: {
     flexDirection: "row",
@@ -854,7 +899,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   cancelButton: {
-    backgroundColor: "#999",
+    backgroundColor: "#757575",
     padding: 10,
     borderRadius: 8,
     flex: 1,
@@ -868,8 +913,5 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 6,
     alignItems: "center",
-  },  
+  },
 });
-
-
-
