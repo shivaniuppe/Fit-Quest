@@ -38,35 +38,38 @@ const WellnessQuestScreen = () => {
 
   const handleCompleteQuest = async () => {
     if (!auth.currentUser) return;
-
+  
     const userId = auth.currentUser.uid;
     const userQuestRef = doc(db, 'userQuests', `${userId}_${quest.id}`);
     const userRef = doc(db, 'users', userId);
     const questRef = doc(db, 'quests', quest.id);
-
+  
     try {
       await updateDoc(userQuestRef, {
         status: 'completed',
         completedAt: serverTimestamp(),
         progress: 1,
       });
-
+  
       await AsyncStorage.removeItem(`wellnessState_${quest.id}`);
-
+  
       const questSnap = await getDoc(questRef);
       const userSnap = await getDoc(userRef);
-
+  
       if (questSnap.exists() && userSnap.exists()) {
         const xpEarned = questSnap.data().xp || 0;
-        const prevXP = userSnap.data().xp || 0;
+        const userData = userSnap.data();
+        const prevXP = userData.xp || 0;
+        const prevQuests = userData.quests || 0; // ✅ track quests
         const newXP = prevXP + xpEarned;
         const newLevel = Math.floor(newXP / 100) + 1;
-
+  
         await updateDoc(userRef, {
           xp: newXP,
           level: newLevel,
+          quests: prevQuests + 1, // ✅ increment quests field
         });
-
+  
         Alert.alert('Quest Complete!', `You earned ${xpEarned} XP!`, [
           { text: 'Great!', onPress: () => navigation.goBack() },
         ]);
@@ -76,6 +79,7 @@ const WellnessQuestScreen = () => {
       Alert.alert('Error', 'Could not complete quest. Please try again.');
     }
   };
+  
 
   return (
     <View style={styles.container}>

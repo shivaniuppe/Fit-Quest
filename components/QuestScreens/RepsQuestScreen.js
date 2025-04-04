@@ -27,12 +27,12 @@ const RepsQuestScreen = () => {
 
   const handleCompleteQuest = async () => {
     if (!auth.currentUser) return;
-
+  
     const userId = auth.currentUser.uid;
     const userQuestRef = doc(db, 'userQuests', `${userId}_${quest.id}`);
     const userRef = doc(db, 'users', userId);
     const questRef = doc(db, 'quests', quest.id);
-
+  
     try {
       // Mark quest as completed
       await updateDoc(userQuestRef, {
@@ -40,21 +40,24 @@ const RepsQuestScreen = () => {
         completedAt: serverTimestamp(),
         progress: 1,
       });
-
+  
       const questSnap = await getDoc(questRef);
       const userSnap = await getDoc(userRef);
-
+  
       if (questSnap.exists() && userSnap.exists()) {
         const xpEarned = questSnap.data().xp || 0;
-        const prevXP = userSnap.data().xp || 0;
+        const userData = userSnap.data();
+        const prevXP = userData.xp || 0;
+        const prevQuests = userData.quests || 0;
         const newXP = prevXP + xpEarned;
         const newLevel = Math.floor(newXP / 100) + 1;
-
+  
         await updateDoc(userRef, {
           xp: newXP,
           level: newLevel,
+          quests: prevQuests + 1, // ✅ Increment quests
         });
-
+  
         Alert.alert('Quest Complete!', `You earned ${xpEarned} XP!`, [
           { text: 'Awesome!', onPress: () => navigation.goBack() },
         ]);
@@ -64,6 +67,7 @@ const RepsQuestScreen = () => {
       Alert.alert('Error', 'Could not complete quest. Please try again.');
     }
   };
+  
 
   return (
     <View style={styles.container}>

@@ -6,6 +6,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ProfileSetupScreen = ({ route, navigation }) => {
   const { userId, email } = route.params;
@@ -115,8 +116,9 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         xp: 0,
         xpGoal: 1000,
         level: 1,
+        stepsToday: 0,
         totalSteps: 0,
-        workouts: 0,
+        quests: 0,
         streak: 0,
         caloriesBurned: 0,
         achievements: [],
@@ -125,6 +127,9 @@ const ProfileSetupScreen = ({ route, navigation }) => {
       }, { merge: true });
 
       navigation.navigate("Home");
+      await AsyncStorage.removeItem("stepsToday");
+      await AsyncStorage.removeItem("baseStepCount");
+
     } catch (err) {
       console.error("Profile setup error:", err);
       setError(err.message || "Failed to save profile. Try a smaller image.");

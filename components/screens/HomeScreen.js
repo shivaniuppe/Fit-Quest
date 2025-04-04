@@ -34,36 +34,144 @@ const MainHomeScreen = () => {
   const [loadingQuest, setLoadingQuest] = useState(false);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [questToAbandon, setQuestToAbandon] = useState(null);
+  const [stepsTodayBase, setStepsTodayBase] = useState(0);
+
 
   // Function to load steps and reset if it's a new day
   const loadSteps = async () => {
-    const today = new Date().toLocaleDateString();
-    const lastResetDate = await AsyncStorage.getItem("lastResetDate");
-    const storedSteps = await AsyncStorage.getItem("stepsToday");
-
-    if (lastResetDate !== today) {
-      await AsyncStorage.setItem("stepsToday", "0");
-      await AsyncStorage.setItem("lastResetDate", today);
-      setSteps(0);
-    } else if (storedSteps) {
-      setSteps(parseInt(storedSteps));
+    try {
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const firestoreStepsToday = userSnap.data().stepsToday || 0;
+        const firestoreTotalSteps = userSnap.data().totalSteps || 0;
+        
+        setSteps(firestoreStepsToday); // UI state
+        setStepsTodayBase(firestoreStepsToday); // for tracking delta
+        
+        console.log("🔥 stepsToday loaded from Firestore:", firestoreStepsToday);
+      }
+    } catch (err) {
+      console.error("🚨 Error loading Firestore stepsToday:", err);
     }
   };
+  
+useEffect(() => {
+  const now = new Date();
+  const millisTillMidnight =
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1) - now;
 
-  useEffect(() => {
-    loadSteps();
-    const subscribe = Pedometer.watchStepCount((result) => {
-      setSteps(result.steps);
-      AsyncStorage.setItem("stepsToday", result.steps.toString());
+  const timeout = setTimeout(async () => {
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await updateDoc(userRef, { stepsToday: 0 });
+
+    setSteps(0);
+    setStepsTodayBase(0);
+    console.log("🌙 stepsToday reset at midnight");
+  }, millisTillMidnight);
+
+  return () => clearTimeout(timeout);
+}, []);
+
+
+useEffect(() => {
+  let lastTrackedSteps = 0;
+  let pedometerSubscription;
+
+  const startTracking = async () => {
+    await loadSteps(); // fetch stepsToday & set base
+
+    pedometerSubscription = Pedometer.watchStepCount(async (result) => {
+      const currentSteps = result.steps;
+      const delta = currentSteps - lastTrackedSteps;
+
+      if (delta > 0) {
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) return;
+
+        const currentStepsToday = userSnap.data().stepsToday || 0;
+        const currentTotal = userSnap.data().totalSteps || 0;
+
+        const newStepsToday = currentStepsToday + delta;
+        const newTotal = currentTotal + delta;
+
+        await updateDoc(userRef, {
+          stepsToday: newStepsToday,
+          totalSteps: newTotal,
+        });
+
+        setSteps(newStepsToday);
+        setStepsTodayBase(newStepsToday);
+        lastTrackedSteps = currentSteps;
+
+        console.log("👟 Steps updated -> Today:", newStepsToday, "| Total:", newTotal);
+      }
     });
-    return () => subscribe.remove();
-  }, []);
+  };
 
-  useEffect(() => {
-    if (auth.currentUser) {
-      fetchWeatherAndQuest();
+  startTracking();
+
+  return () => {
+    if (pedometerSubscription) {
+      pedometerSubscription.remove();
     }
-  }, [auth.currentUser]);
+  };
+}, []);
+
+
+  
+  
+  useEffect(() => {
+    if (!auth.currentUser) return;
+  
+    const checkAndUpdateStreak = async () => {
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+  
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const lastActiveDate = new Date(userData.lastActive);
+        const currentDate = new Date();
+  
+        // Get just the dates (no time)
+        const lastDay = new Date(lastActiveDate.getFullYear(), lastActiveDate.getMonth(), lastActiveDate.getDate());
+        const currentDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  
+        const diffDays = Math.floor((currentDay - lastDay) / (1000 * 60 * 60 * 24));
+  
+        if (diffDays === 1) {
+          // ✅ Consecutive day → increment streak
+          const newStreak = (userData.streak || 0) + 1;
+          await updateDoc(userRef, {
+            streak: newStreak,
+            lastActive: currentDate.toISOString(),
+          });
+          console.log("🔥 Streak incremented to:", newStreak);
+        } else if (diffDays > 1) {
+          // 🧊 Missed a day → reset streak
+          await updateDoc(userRef, {
+            streak: 1,
+            lastActive: currentDate.toISOString(),
+          });
+          console.log("🔁 Streak reset to 1");
+        } else {
+          // 🤝 Already logged in today → just update lastActive
+          await updateDoc(userRef, {
+            lastActive: currentDate.toISOString(),
+          });
+          console.log("✅ Streak maintained");
+        }
+      }
+    };
+  
+    checkAndUpdateStreak();
+  }, []);
+  
+  
+ 
+  
+  
   
   
 
@@ -354,6 +462,7 @@ const MainHomeScreen = () => {
           await updateDoc(userRef, {
             xp: newXP,
             level: newLevel,
+            quests: newQuestCount
           });
   
           setLevel(newLevel);

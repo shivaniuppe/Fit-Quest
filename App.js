@@ -13,6 +13,7 @@ import { uploadQuests } from "./components/utils/uploadQuests";
 import RepsQuestScreen from "./components/QuestScreens/RepsQuestScreen";
 import TimedQuestScreen from "./components/QuestScreens/TimedQuestScreen";
 import WellnessQuestScreen from "./components/QuestScreens/WellnessQuestScreen";
+import { uploadAchievements } from './components/utils/uploadAchievements';
 
 
 const Stack = createStackNavigator();
@@ -20,6 +21,7 @@ const Stack = createStackNavigator();
 export default function App() {
   useEffect(() => {
     uploadQuests();
+    uploadAchievements();
   }, []);
   return (
     <NavigationContainer>

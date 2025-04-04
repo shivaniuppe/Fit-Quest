@@ -3,6 +3,9 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "reac
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
 import { FontAwesome } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Pedometer } from "expo-sensors";
+
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -12,6 +15,8 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      await AsyncStorage.removeItem("stepsToday");
+      await AsyncStorage.removeItem("baseStepCount");
       navigation.navigate("Home");
     } catch (err) {
       setError(err.message);
