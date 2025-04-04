@@ -11,6 +11,9 @@ import JourneyScreen from "./components/QuestScreens/JourneyScreen";
 import { useEffect } from "react";
 import { uploadQuests } from "./components/utils/uploadQuests"; 
 import RepsQuestScreen from "./components/QuestScreens/RepsQuestScreen";
+import TimedQuestScreen from "./components/QuestScreens/TimedQuestScreen";
+import WellnessQuestScreen from "./components/QuestScreens/WellnessQuestScreen";
+
 
 const Stack = createStackNavigator();
 
@@ -29,6 +32,8 @@ export default function App() {
         <Stack.Screen name="RunQuestScreen" component={RunQuestScreen} />
         <Stack.Screen name="JourneyScreen" component={JourneyScreen} />
         <Stack.Screen name="RepsQuestScreen" component={RepsQuestScreen} />
+        <Stack.Screen name="TimedQuestScreen" component={TimedQuestScreen} />
+        <Stack.Screen name="WellnessQuestScreen" component={WellnessQuestScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>

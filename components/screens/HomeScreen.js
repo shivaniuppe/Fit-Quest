@@ -31,6 +31,8 @@ const MainHomeScreen = () => {
   });
   const [suggestedQuest, setSuggestedQuest] = useState(null);
   const [loadingQuest, setLoadingQuest] = useState(false);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
+  const [questToAbandon, setQuestToAbandon] = useState(null);
 
   // Function to load steps and reset if it's a new day
   const loadSteps = async () => {
@@ -354,6 +356,31 @@ const MainHomeScreen = () => {
       console.error("Error completing quest:", error);
     }
   };
+  const handleAbandonQuest = async () => {
+    if (!auth.currentUser || !questToAbandon) return;
+  
+    const userId = auth.currentUser.uid;
+    const userQuestRef = doc(db, "userQuests", `${userId}_${questToAbandon.id}`);
+  
+    try {
+      await updateDoc(userQuestRef, {
+        status: "abandoned",
+        abandonedAt: serverTimestamp(),
+      });
+  
+      setAcceptedQuests((prev) =>
+        prev.filter((quest) => quest.id !== questToAbandon.id)
+      );
+      setShowAbandonModal(false);
+      setQuestToAbandon(null);
+  
+      alert("Quest abandoned. It'll return to the available quests.");
+    } catch (error) {
+      console.error("Error abandoning quest:", error);
+      alert("Failed to abandon quest. Try again.");
+    }
+  };
+  
   
 
   return (
@@ -467,25 +494,50 @@ const MainHomeScreen = () => {
                 borderWidth={0} 
               />
               <Text style={styles.questValue}>{Math.round(item.progress * 100)}%</Text>
-
+          
               <View style={styles.buttonsContainer}>
-                {item.status === "accepted" ? (
+                {item.status === "accepted" && (
+                <>
                   <TouchableOpacity
                     style={styles.startButton}
                     onPress={() => handleStartQuest(item.id)}
                   >
                     <Text style={styles.buttonText}>Start</Text>
                   </TouchableOpacity>
-                ) : item.status === "in-progress" ? (
                   <TouchableOpacity
-                    style={styles.completeButton}
-                    onPress={() => handleCompleteQuest(item.id)}
+                    style={styles.abandonButton}
+                    onPress={() => {
+                      setQuestToAbandon(item);
+                      setShowAbandonModal(true);
+                    }}
                   >
-                    <Text style={styles.buttonText}>Complete</Text>
+                    <Text style={styles.buttonText}>Abandon</Text>
                   </TouchableOpacity>
-                ) : null}
+                </>
+              )}
+              {item.status === "in-progress" && (
+                <>
+                  <TouchableOpacity
+                    style={styles.resumeButton}
+                    onPress={() => handleStartQuest(item.id)}
+                  >
+                    <Text style={styles.buttonText}>Resume</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.abandonButton}
+                    onPress={() => {
+                      setQuestToAbandon(item);
+                      setShowAbandonModal(true);
+                    }}
+                  >
+                    <Text style={styles.buttonText}>Abandon</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
               </View>
-            </View>
+            </View>   
+                   
           )}
         />
       ) : (
@@ -496,7 +548,35 @@ const MainHomeScreen = () => {
           </TouchableOpacity>
         </View>
       )}
+      {showAbandonModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalText}>
+              Are you sure you want to abandon "{questToAbandon?.title}"?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowAbandonModal(false);
+                  setQuestToAbandon(null);
+                }}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmAbandonButton}
+                onPress={handleAbandonQuest}
+              >
+                <Text style={styles.buttonText}>Yes, Abandon</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
     </View>
+  
   );
 };
 
@@ -724,7 +804,73 @@ const styles = StyleSheet.create({
   },
   loadingIndicator: {
     marginVertical: 8
-  }
+  },
+  resumeButton: {
+    backgroundColor: "#FFA000",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginRight: 6,
+  }, 
+  resumeButton: {
+    backgroundColor: "#FFA000",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginRight: 6,
+  },
+  abandonButton: {
+    backgroundColor: "#9E9E9E",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginLeft: 6,
+  },
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  modalBox: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalText: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelButton: {
+    backgroundColor: "#999",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 6,
+    alignItems: "center",
+  },
+  confirmAbandonButton: {
+    backgroundColor: "#FF5722",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 6,
+    alignItems: "center",
+  },  
 });
 
 
