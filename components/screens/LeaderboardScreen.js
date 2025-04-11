@@ -2,60 +2,83 @@ import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { auth, db } from "../../firebaseConfig";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { onAuthStateChanged } from "firebase/auth";
 
 const LeaderboardScreen = () => {
   const [topPlayers, setTopPlayers] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
 
   useEffect(() => {
-    setLoading(true);
-    const usersQuery = query(collection(db, "users"), orderBy("xp", "desc"));
-    
-    // onSnapshot returns an unsubscribe function
-    const unsubscribe = onSnapshot(usersQuery, (querySnapshot) => {
-      try {
-        const usersData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          isYou: doc.id === auth.currentUser?.uid,
-        }));
-
-        // Format XP with commas
-        const formatXP = (xp) => xp?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ",") || "0";
-
-        // Assign ranks to all players
-        const rankedUsers = usersData.map((player, index) => ({
-          ...player,
-          xp: `${formatXP(player.xp)} XP`,
-          rank: index + 1,
-        }));
-
-        // Top 3 players
-        const topPlayers = rankedUsers.slice(0, 3).map((player, index) => ({
-          ...player,
-          position: `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`,
-        }));
-
-        // Other players
-        const otherPlayers = rankedUsers.slice(3);
-
-        setTopPlayers(topPlayers);
-        setPlayers(otherPlayers);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error processing snapshot:", error);
-        setLoading(false);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user); // true if user exists
     });
 
-    // Return the cleanup function
-    return () => {
-      unsubscribe(); // Call the unsubscribe function
-    };
+    return () => unsubscribe();
   }, []);
+
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+  
+    setLoading(true);
+    const usersQuery = query(collection(db, "users"), orderBy("xp", "desc"));
+  
+    const unsubscribe = onSnapshot(
+      usersQuery,
+      (querySnapshot) => {
+        if (!auth.currentUser) return; // 🛡️ Prevent processing after logout
+  
+        try {
+          const usersData = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            isYou: doc.id === auth.currentUser?.uid,
+          }));
+  
+          const formatXP = (xp) => xp?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ",") || "0";
+  
+          const rankedUsers = usersData.map((player, index) => ({
+            ...player,
+            xp: `${formatXP(player.xp)} XP`,
+            rank: index + 1,
+          }));
+  
+          const topPlayers = rankedUsers.slice(0, 3).map((player, index) => ({
+            ...player,
+            position: `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`,
+          }));
+  
+          const otherPlayers = rankedUsers.slice(3);
+  
+          setTopPlayers(topPlayers);
+          setPlayers(otherPlayers);
+          setLoading(false);
+        } catch (error) {
+          console.error("Error processing snapshot:", error);
+          setLoading(false);
+        }
+      },
+      (error) => {
+        if (error.code === "permission-denied") {
+          console.warn("❌ LeaderboardScreen snapshot blocked after logout");
+          setTopPlayers([]);
+          setPlayers([]);
+          setLoading(false);
+        } else {
+          console.error("🔥 Snapshot error in leaderboard:", error);
+          setLoading(false);
+        }
+      }
+    );
+  
+    return () => unsubscribe();
+  }, [isLoggedIn]);
+  
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -82,12 +105,13 @@ const LeaderboardScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
-      <View style={styles.header}>
-        <FontAwesome name="trophy" size={18} color="white" />
-        <Text style={styles.headerTitle}>Leaderboard</Text>
+      <View style={styles.headerCentered}>
+        <FontAwesome name="trophy" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+        <Text style={styles.headerTitle}>Top Adventurers</Text>
       </View>
+
 
       {/* Top 3 Players */}
       <View style={styles.topContainer}>
@@ -122,7 +146,7 @@ const LeaderboardScreen = () => {
         maxToRenderPerBatch={10}
         windowSize={5}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -138,7 +162,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 20,
     fontWeight: "bold",
-    marginLeft: 10,
   },
   topContainer: {
     flexDirection: "row",
@@ -208,6 +231,12 @@ const styles = StyleSheet.create({
   crownIcon: {
     marginLeft: "auto",
   },
+  headerCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },  
 });
 
 export default LeaderboardScreen;

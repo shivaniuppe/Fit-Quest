@@ -1,13 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet } from "react-native";
-import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
-import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, where, onSnapshot } from "firebase/firestore";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { auth, db } from "../../firebaseConfig";
+import { collection, getDocs, doc, setDoc, query, where, onSnapshot } from "firebase/firestore";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { onAuthStateChanged } from "firebase/auth";
 
 const QuestsScreen = ({ navigation }) => {
   const [quests, setQuests] = useState([]);
   const [acceptedQuests, setAcceptedQuests] = useState([]);
-  const [activeTab, setActiveTab] = useState("available"); // State to manage active tab
+  const [activeTab, setActiveTab] = useState("available"); 
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user); 
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   useEffect(() => {
     const fetchQuests = async () => {
@@ -20,27 +32,38 @@ const QuestsScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    if (!auth.currentUser) {
-      setAcceptedQuests([]); // Clear accepted quests if no user is logged in
+    if (!isLoggedIn) {
+      setAcceptedQuests([]); 
       return;
     }
-
+  
     const userId = auth.currentUser.uid;
-
-    // Listen for real-time updates to the userQuests collection
     const userQuestsRef = collection(db, "userQuests");
     const userQuestsQuery = query(userQuestsRef, where("userId", "==", userId));
-
-    const unsubscribe = onSnapshot(userQuestsQuery, (querySnapshot) => {
-      const acceptedQuestsData = querySnapshot.docs.map((doc) => ({
-        questId: doc.data().questId,
-        status: doc.data().status, // Include the status of the quest
-      }));
-      setAcceptedQuests(acceptedQuestsData);
-    });
-
-    return () => unsubscribe(); // Cleanup the listener on unmount
-  }, [auth.currentUser]);
+  
+    const unsubscribe = onSnapshot(
+      userQuestsQuery,
+      (querySnapshot) => {
+        if (!auth.currentUser) return; // 🛡️ Extra guard
+        const acceptedQuestsData = querySnapshot.docs.map((doc) => ({
+          questId: doc.data().questId,
+          status: doc.data().status,
+        }));
+        setAcceptedQuests(acceptedQuestsData);
+      },
+      (error) => {
+        if (error.code === "permission-denied") {
+          console.warn("❌ QuestsScreen snapshot blocked after logout");
+          setAcceptedQuests([]);
+        } else {
+          console.error("🔥 QuestsScreen snapshot error:", error);
+        }
+      }
+    );
+  
+    return () => unsubscribe();
+  }, [isLoggedIn]);
+  
 
   // Separate quests into available and accepted
   const availableQuests = quests.filter(
@@ -143,20 +166,15 @@ const QuestsScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header Section */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerIcons}>
-          <Text style={styles.xpText}>💎 2,450</Text>
-          <Image source={{ uri: "https://via.placeholder.com/40" }} style={styles.avatar} />
-        </View>
-      </View>
 
       {/* Title */}
-      <Text style={styles.title}>Select Your Quest</Text>
+      <View style={styles.headerCentered}>
+        <FontAwesome5 name="scroll" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+        <Text style={styles.title}>Select Your Quest</Text>
+      </View>
+
 
       {/* Tab Bar */}
       <View style={styles.tabBar}>
@@ -176,7 +194,7 @@ const QuestsScreen = ({ navigation }) => {
 
       {/* Quest List */}
       {renderQuests()}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -186,7 +204,7 @@ const styles = StyleSheet.create({
   headerIcons: { flexDirection: "row", alignItems: "center" },
   xpText: { color: "white", fontSize: 16, fontWeight: "bold", marginRight: 10 },
   avatar: { width: 35, height: 35, borderRadius: 17.5 },
-  title: { color: "white", fontSize: 20, fontWeight: "bold", marginBottom: 15 },
+  title: { color: "white", fontSize: 20, fontWeight: "bold" },
   tabBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -215,6 +233,13 @@ const styles = StyleSheet.create({
   questXP: { color: "white", alignSelf: "flex-end", fontSize: 14, marginBottom: 10 },
   acceptButton: { backgroundColor: "#3A3A3A", padding: 10, borderRadius: 5, alignItems: "center" },
   acceptButtonText: { color: "white", fontSize: 14, fontWeight: "bold" },
+  headerCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  
 });
 
 export default QuestsScreen;

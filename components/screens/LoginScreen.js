@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { auth, db } from "../../firebaseConfig";
 import { FontAwesome } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Pedometer } from "expo-sensors";
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 export default function LoginScreen({ navigation }) {
@@ -24,9 +24,8 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* App Logo */}
-     {/* <Image source={require("./Users/shivaniuppe/Desktop/FitQuest/assets/dumbbell.png")} style={styles.logo} /> */}
       <Text style={styles.title}>FitQuest</Text>
 
       {/* Email Input */}
@@ -66,22 +65,7 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.forgotPassword}>Forgot password?</Text>
       </TouchableOpacity>
 
-      {/* Divider */}
-      <Text style={styles.orText}>Or continue with</Text>
-
-      {/* Social Login Buttons */}
-      <View style={styles.socialContainer}>
-        <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="google" size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="apple" size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="facebook" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -143,20 +127,6 @@ const styles = StyleSheet.create({
   forgotPassword: {
     color: "#aaa",
     marginBottom: 20,
-  },
-  orText: {
-    color: "#aaa",
-    marginVertical: 10,
-  },
-  socialContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "60%",
-  },
-  socialButton: {
-    backgroundColor: "#1E1E1E",
-    padding: 10,
-    borderRadius: 8,
   },
   errorText: {
     color: "red",

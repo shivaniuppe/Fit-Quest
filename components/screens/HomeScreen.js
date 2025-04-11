@@ -3,18 +3,24 @@ import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, ActivityIndi
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as Progress from "react-native-progress";
 import { Pedometer } from "expo-sensors";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { collection, getDoc, doc, onSnapshot, updateDoc, query, where, serverTimestamp, setDoc, getDocs, limit } from "firebase/firestore";
-import { auth, db } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { auth, db } from "../../firebaseConfig";
 import QuestsScreen from "./QuestsScreen";
 import LeaderboardScreen from "./LeaderboardScreen";
 import ProfileScreen from "./ProfileScreen";
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { getWeatherData, getWeatherIcon, getWorkoutSuggestion } from '/Users/shivaniuppe/Desktop/Fit-Quest/components/utils/weatherService.js';
+import { getWeatherData, getWeatherIcon, getWorkoutSuggestion } from '../services/weatherService';
 import { deleteDoc } from "firebase/firestore";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getLevelFromXP, getXPForNextLevel } from '../utils/levelUtils'; // adjust path if needed
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { onAuthStateChanged } from "firebase/auth";
+
+
 
 const MainHomeScreen = () => {
   const [steps, setSteps] = useState(0);
@@ -35,6 +41,19 @@ const MainHomeScreen = () => {
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [questToAbandon, setQuestToAbandon] = useState(null);
   const [stepsTodayBase, setStepsTodayBase] = useState(0);
+  const [xp, setXP] = useState(0);
+  const [xpForNextLevel, setXpForNextLevel] = useState(100); 
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user); // true if user exists
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+
 
 
   // Function to load steps and reset if it's a new day
@@ -42,19 +61,36 @@ const MainHomeScreen = () => {
     try {
       const userRef = doc(db, "users", auth.currentUser.uid);
       const userSnap = await getDoc(userRef);
+  
       if (userSnap.exists()) {
-        const firestoreStepsToday = userSnap.data().stepsToday || 0;
-        const firestoreTotalSteps = userSnap.data().totalSteps || 0;
-        
-        setSteps(firestoreStepsToday); // UI state
-        setStepsTodayBase(firestoreStepsToday); // for tracking delta
-        
-        console.log("🔥 stepsToday loaded from Firestore:", firestoreStepsToday);
+        const userData = userSnap.data();
+        const firestoreStepsToday = userData.stepsToday || 0;
+        const firestoreTotalSteps = userData.totalSteps || 0;
+  
+        const lastUpdated = userData.lastStepsUpdateDate || null;
+        const today = new Date().toISOString().split("T")[0]; // 'YYYY-MM-DD'
+  
+        if (lastUpdated !== today) {
+          console.log("🕛 New day detected! Resetting stepsToday to 0.");
+  
+          await updateDoc(userRef, {
+            stepsToday: 0,
+            lastStepsUpdateDate: today,
+          });
+  
+          setSteps(0);
+          setStepsTodayBase(0);
+        } else {
+          setSteps(firestoreStepsToday);
+          setStepsTodayBase(firestoreStepsToday);
+          console.log("🔥 stepsToday loaded from Firestore:", firestoreStepsToday);
+        }
       }
     } catch (err) {
       console.error("🚨 Error loading Firestore stepsToday:", err);
     }
   };
+  
   
 useEffect(() => {
   const now = new Date();
@@ -171,8 +207,36 @@ useEffect(() => {
   
  
   
+  useEffect(() => {
+    console.log("🌤 Calling fetchWeatherAndQuest...");
+    fetchWeatherAndQuest();
+  }, []);
   
   
+  useFocusEffect(
+    useCallback(() => {
+      const fetchXPAndLevel = async () => {
+        if (!auth.currentUser) return;
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+  
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const currentXP = userData.xp || 0;
+  
+          const userLevel = getLevelFromXP(currentXP);
+          const xpNext = getXPForNextLevel(userLevel);
+          const xpPrev = getXPForNextLevel(userLevel - 1) || 0;
+  
+          setXP(currentXP);
+          setLevel(userLevel);
+          setXpForNextLevel(xpNext - xpPrev);
+        }
+      };
+  
+      fetchXPAndLevel();
+    }, [])
+  );
   
 
   const getNewSuggestedQuest = async (currentWeather) => {
@@ -342,51 +406,66 @@ useEffect(() => {
   
 
   useEffect(() => {
-    if (!user) return;
+    if (!isLoggedIn) return;
   
     const userQuestsRef = collection(db, "userQuests");
     const userQuestsQuery = query(
-      userQuestsRef, 
-      where("userId", "==", user.uid), 
+      userQuestsRef,
+      where("userId", "==", auth.currentUser.uid),
       where("status", "in", ["accepted", "in-progress"])
     );
   
-    const unsubscribe = onSnapshot(userQuestsQuery, async (querySnapshot) => {
-      if (querySnapshot.empty) {
-        setAcceptedQuests([]);
-        setLoading(false);
-        return;
-      }
+    const unsubscribe = onSnapshot(
+      userQuestsQuery,
+      async (querySnapshot) => {
+        if (!auth.currentUser) return;
   
-      const fetchQuests = querySnapshot.docs.map(async (questDoc) => {
-        const questData = questDoc.data();
-        const questId = questData.questId;
-  
-        try {
-          const questDocRef = doc(db, "quests", questId);
-          const questDocSnap = await getDoc(questDocRef);
-  
-          if (questDocSnap.exists()) {
-            return {
-              ...questDocSnap.data(),
-              id: questId,
-              status: questData.status,
-              progress: questData.progress || 0,
-            };
-          }
-        } catch (error) {
-          console.error("Error fetching quest details:", error);
+        if (querySnapshot.empty) {
+          setAcceptedQuests([]);
+          setLoading(false);
+          return;
         }
-        return null;
-      });
   
-      const acceptedQuestsData = (await Promise.all(fetchQuests)).filter(Boolean);
-      setAcceptedQuests(acceptedQuestsData);
-      setLoading(false);
-    });
+        const fetchQuests = querySnapshot.docs.map(async (questDoc) => {
+          const questData = questDoc.data();
+          const questId = questData.questId;
+  
+          try {
+            const questDocRef = doc(db, "quests", questId);
+            const questDocSnap = await getDoc(questDocRef);
+  
+            if (questDocSnap.exists()) {
+              return {
+                ...questDocSnap.data(),
+                id: questId,
+                status: questData.status,
+                progress: questData.progress || 0,
+              };
+            }
+          } catch (error) {
+            console.error("Error fetching quest details:", error);
+          }
+  
+          return null;
+        });
+  
+        const acceptedQuestsData = (await Promise.all(fetchQuests)).filter(Boolean);
+        setAcceptedQuests(acceptedQuestsData);
+        setLoading(false);
+      },
+      (error) => {
+        if (error.code === "permission-denied") {
+          setAcceptedQuests([]);
+          setLoading(false);
+        } else {
+          console.error("🔥 Snapshot listener error:", error);
+        }
+      }
+    );
   
     return () => unsubscribe();
-  }, [user]);
+  }, [isLoggedIn]);  
+  
   
   if (loading) {
     return <ActivityIndicator size="large" color="black" style={{ flex: 1 }} />;
@@ -411,7 +490,7 @@ useEffect(() => {
         // ✅ Dynamic navigation based on activityType
         switch (quest.activityType) {
           case "Active":
-            navigation.navigate("RunQuestScreen", { quest });
+            navigation.navigate("MapQuestScreen", { quest });
             break;
           case "Reps":
             navigation.navigate("RepsQuestScreen", { quest });
@@ -506,41 +585,62 @@ useEffect(() => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+
+      <View style={styles.headerCentered}>
+        <FontAwesome5 name="columns" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+        <Text style={styles.headerTitle}>Your Dashboard</Text>
+      </View>
+
       {/* Top Bar with Level and Settings */}
-      <View style={styles.topBar}>
-        <View style={styles.levelContainer}>
-          <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
-          <View style={styles.levelProgress}>
-            <Text style={styles.levelText}>Level {level} ⭐</Text>
+      {/* Combined Top Bar: Avatar + Level + Steps Today */}
+      <View style={styles.topBarCombined}>
+        <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
+        <View style={styles.levelStepsBlock}>
+          <Text style={styles.levelText}>Level {level} ⭐</Text>
+            {typeof xp === 'number' && typeof xpForNextLevel === 'number' && (
+    <>
+      {(() => {
+        const prevXP = getXPForNextLevel(level - 1) || 0;
+        const progress = xpForNextLevel > 0 ? (xp - prevXP) / xpForNextLevel : 0;
+
+        return (
+          <>
             <Progress.Bar 
-              progress={level / 100} 
-              width={150} 
-              height={8}
+              progress={progress}
+              width={160} 
+              height={6}
               color="#4CAF50" 
               unfilledColor="#333"
               borderWidth={0} 
+              style={{ marginBottom: 6 }}
             />
-          </View>
-        </View>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings-outline" size={24} color="black" />
-        </TouchableOpacity>
-      </View>
+            <Text style={{ color: "#AAAAAA", fontSize: 12 }}>
+              {xp} / {getXPForNextLevel(level)} XP
+            </Text>
+          </>
+        );
+      })()}
+    </>
+  )}
 
-      {/* Steps Progress */}
-      <View style={styles.stepsContainer}>
-        <Text style={styles.stepsText}>Steps Today</Text>
-        <Progress.Bar 
-          progress={steps / stepsGoal} 
-          width={null} 
-          height={10}
-          color="#2196F3" 
-          unfilledColor="#333"
-          borderWidth={0} 
-        />
-        <Text style={styles.stepsCount}>{steps} / {stepsGoal} steps</Text>
-      </View>
+
+
+
+          <Text style={styles.stepsTodayText}>👟 {steps} / {stepsGoal} steps</Text>
+          <Progress.Bar 
+            progress={steps / stepsGoal} 
+            width={160} 
+            height={6}
+            color="#2196F3" 
+            unfilledColor="#333"
+            borderWidth={0} 
+            style={{ marginTop: 4 }}
+          />
+        </View>
+        </View>
+
+
 
       {/* Combined Weather and Suggested Quest Card */}
       <View style={styles.weatherQuestCard}>
@@ -617,15 +717,6 @@ useEffect(() => {
                   <Text style={styles.xpText}>+{item.xp} XP</Text>
                 </View>
               </View>
-              <Progress.Bar 
-                progress={item.progress} 
-                width={null} 
-                height={6}
-                color="#4CAF50" 
-                unfilledColor="#333"
-                borderWidth={0} 
-              />
-              <Text style={styles.questValue}>{Math.round(item.progress * 100)}%</Text>
           
               <View style={styles.buttonsContainer}>
                 {item.status === "accepted" && (
@@ -648,24 +739,17 @@ useEffect(() => {
                 </>
               )}
               {item.status === "in-progress" && (
-                <>
-                  <TouchableOpacity
-                    style={styles.resumeButton}
-                    onPress={() => handleStartQuest(item.id)}
-                  >
-                    <Text style={styles.buttonText}>Resume</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.abandonButton}
-                    onPress={() => {
-                      setQuestToAbandon(item);
-                      setShowAbandonModal(true);
-                    }}
-                  >
-                    <Text style={styles.buttonText}>Abandon</Text>
-                  </TouchableOpacity>
-                </>
+                <TouchableOpacity
+                  style={styles.abandonButton}
+                  onPress={() => {
+                    setQuestToAbandon(item);
+                    setShowAbandonModal(true);
+                  }}
+                >
+                  <Text style={styles.buttonText}>Abandon</Text>
+                </TouchableOpacity>
               )}
+
 
               </View>
             </View>   
@@ -707,7 +791,7 @@ useEffect(() => {
       </View>
     )}
 
-    </View>
+    </SafeAreaView>
   
   );
 };
@@ -1023,4 +1107,35 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     alignItems: "center",
   },
+  topBarCombined: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginBottom: 20,
+  },
+  levelStepsBlock: {
+    marginLeft: 12,
+  },
+  stepsTodayText: {
+    fontSize: 13,
+    color: "#AAAAAA",
+    marginTop: 4,
+  },  
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8, // optional spacing between icon and text
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF'
+  },  
+  headerCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },  
 });

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
+import { TextInput, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { auth } from "../../firebaseConfig";
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -17,7 +18,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* App Logo */}
       {/*<Image source={require("../assets/dumbbell.png")} style={styles.logo} /> */}
       <Text style={styles.title}>Reset Password</Text>
@@ -43,7 +44,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.backButtonText}>Back to Login</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

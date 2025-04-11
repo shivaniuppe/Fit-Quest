@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
-import { FontAwesome } from "@expo/vector-icons"; // Import FontAwesome for icons
-//import { signInWithGoogle, signInWithApple, signInWithFacebook } from "/Users/shivaniuppe/Desktop/FitQuest/components/utils/authMethods.js";
-
+import { auth } from "../../firebaseConfig";
+import { FontAwesome } from "@expo/vector-icons"; 
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignupScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -28,7 +27,7 @@ export default function SignupScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* App Logo */}
      {/* <Image source={require("../assets/dumbbell.png")} style={styles.logo} /> */}
       <Text style={styles.title}>FitQuest</Text>
@@ -64,24 +63,7 @@ export default function SignupScreen({ navigation }) {
       <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.loginButtonText}>Login</Text>
       </TouchableOpacity>
-
-        {/* Divider */}
-        <Text style={styles.orText}>Or continue with</Text>
-      
-
-      {/* Social Login Buttons */}
-      <View style={styles.socialContainer}>
-      <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="google" size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="apple" size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <FontAwesome name="facebook" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -125,21 +107,6 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  socialContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 15,
-  },
-  socialButton: {
-    backgroundColor: "#1E1E1E",
-    padding: 12,
-    marginHorizontal: 10,
-    borderRadius: 50,
-  },
-  orText: {
-    color: "#aaa",
-    marginVertical: 10,
   },
   loginButton: {
     borderColor: "white",

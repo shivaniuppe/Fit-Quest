@@ -1,20 +1,110 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { SafeAreaView, Text, StyleSheet, Alert, View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
 import { useNavigation } from "@react-navigation/native";
-import { GOOGLE_API_KEY } from '/Users/shivaniuppe/Desktop/Fit-Quest/secrets.js';
+import { GOOGLE_API_KEY } from "../../secrets";
+import { doc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebaseConfig";
+import ConfettiCannon from 'react-native-confetti-cannon';
+import { updateUserStatsOnQuestComplete } from "../utils/userStats";
+import { updateDistanceStat } from "../utils/updateDistanceStat";
+
+const darkMapStyle = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#1d2c4d" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8ec3b9" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#1a3646" }],
+  },
+  {
+    featureType: "administrative.country",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#4b6878" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "landscape.man_made",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#334e87" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6f9ba5" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry.fill",
+    stylers: [{ color: "#023e58" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#3C7680" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#304a7d" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#98a5be" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#1d2c4d" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }],
+  },
+];
 
 const JourneyScreen = ({ route }) => {
-  const { destination, quest } = route.params; // Get destination and quest data
-  const [location, setLocation] = useState(null); // User's current location
-  const [errorMsg, setErrorMsg] = useState(null); // Error message for location
-  const [region, setRegion] = useState(null); // Map region (initial region only)
-  const mapRef = useRef(null); // Reference to the MapView
+  const { destination, quest } = route.params;
+  const [location, setLocation] = useState(null);
+  const [region, setRegion] = useState(null);
+  const mapRef = useRef(null);
   const navigation = useNavigation();
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [questCompleted, setQuestCompleted] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState(null);
 
-  // Memoize the origin and destination to avoid unnecessary re-renders
   const origin = useMemo(() => {
     if (!location) return null;
     return {
@@ -31,46 +121,37 @@ const JourneyScreen = ({ route }) => {
     };
   }, [destination]);
 
-  // Fetch the user's location and subscribe to updates
   useEffect(() => {
     let subscription;
 
     const startTracking = async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setErrorMsg("Permission to access location was denied");
-        return;
-      }
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
-      // Get the initial location
-      let location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({});
       setLocation(location);
 
-      // Set the initial map region with a zoomed-in view
       setRegion({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        latitudeDelta: 0.005, // Smaller value for zoomed-in view
-        longitudeDelta: 0.005, // Smaller value for zoomed-in view
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
       });
 
-      // Subscribe to location updates
       subscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High, // High accuracy for better tracking
-          timeInterval: 1000, // Update every 1 second
-          distanceInterval: 1, // Update every 1 meter
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000,
+          distanceInterval: 1,
         },
         (newLocation) => {
-          setLocation(newLocation); // Update the user's location in state
-
-          // Smoothly animate the map to the new location (optional)
+          setLocation(newLocation);
           if (mapRef.current) {
             mapRef.current.animateToRegion({
               latitude: newLocation.coords.latitude,
               longitude: newLocation.coords.longitude,
-              latitudeDelta: 0.005, // Keep the zoom level consistent
-              longitudeDelta: 0.005, // Keep the zoom level consistent
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
             });
           }
         }
@@ -78,18 +159,11 @@ const JourneyScreen = ({ route }) => {
     };
 
     startTracking();
-
-    // Clean up the subscription when the component unmounts
-    return () => {
-      if (subscription) {
-        subscription.remove();
-      }
-    };
+    return () => subscription?.remove();
   }, []);
 
-  // Calculate distance between two coordinates
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of the Earth in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
@@ -99,13 +173,11 @@ const JourneyScreen = ({ route }) => {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in km
-    return distance;
+    return R * c;
   };
 
-  // Track progress towards the destination
   useEffect(() => {
-    if (location && destination) {
+    if (location && destination && !questCompleted) {
       const distance = calculateDistance(
         location.coords.latitude,
         location.coords.longitude,
@@ -114,35 +186,71 @@ const JourneyScreen = ({ route }) => {
       );
 
       if (distance <= 0.1) {
-        // If the user is within 100 meters of the destination
-        Alert.alert(
-          "Congratulations!",
-          "You've reached your destination!",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                // Redirect to the home screen
-                navigation.navigate("Home", { quest }); // Pass the quest data to the home screen
-              },
-            },
-          ]
-        );
+        setQuestCompleted(true);
+        setShowConfetti(true);
+        completeRunQuest();
       }
     }
   }, [location]);
 
+  useEffect(() => {
+    if (completionMessage) {
+      setTimeout(() => {
+        setShowConfetti(false);
+        navigation.navigate("Home");
+      }, 2500);
+    }
+  }, [completionMessage]);
+
+  const completeRunQuest = async () => {
+    try {
+      const userId = auth.currentUser.uid;
+      const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
+      await updateDoc(userQuestRef, {
+        status: "completed",
+        completedAt: serverTimestamp(),
+      });
+
+      const questRef = doc(db, "quests", quest.id);
+      const questSnap = await getDoc(questRef);
+      if (questSnap.exists()) {
+        const questData = questSnap.data();
+        await updateUserStatsOnQuestComplete(userId, questData);
+
+        let distanceInKm = 0;
+        if (quest.goal.toLowerCase().includes("km")) {
+          distanceInKm = parseFloat(quest.goal.toLowerCase().replace("km", "").trim());
+        } else {
+          distanceInKm = parseFloat(quest.goal) * 0.000762;
+        }
+
+        if (quest.title.toLowerCase().includes("cycle")) {
+          await updateDistanceStat(userId, distanceInKm, "cyclingDistance");
+        } else if (quest.title.toLowerCase().includes("run")) {
+          await updateDistanceStat(userId, distanceInKm, "runningDistance");
+        }
+
+        setCompletionMessage(`+${questData.xp} XP · ${questData.calories} kcal burned`);
+      }
+    } catch (error) {
+      console.error("❌ Error completing run quest:", error);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Map View */}
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      <View style={styles.overlay}>
+        <Text style={styles.overlayText}>{quest.title}</Text>
+      </View>
+
       {location && region ? (
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={region} // Set the initial region only
-          onRegionChangeComplete={(newRegion) => setRegion(newRegion)} // Allow user to manually move the map
+          initialRegion={region}
+          customMapStyle={darkMapStyle}
+          onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
         >
-          {/* Marker for the user's current location */}
           <Marker
             coordinate={{
               latitude: location.coords.latitude,
@@ -151,8 +259,6 @@ const JourneyScreen = ({ route }) => {
             title="Your Location"
             description="You are here"
           />
-
-          {/* Marker for the destination */}
           {destination && (
             <Marker
               coordinate={{
@@ -163,29 +269,42 @@ const JourneyScreen = ({ route }) => {
               description="Your destination"
             />
           )}
-
-          {/* Display the route */}
           {origin && memoizedDestination && (
             <MapViewDirections
               origin={origin}
               destination={memoizedDestination}
               apikey={GOOGLE_API_KEY}
               strokeWidth={3}
-              strokeColor="blue"
+              strokeColor="cyan"
             />
           )}
         </MapView>
       ) : (
         <Text style={styles.mapPlaceholder}>Loading map...</Text>
       )}
-    </View>
+
+      {showConfetti && (
+        <ConfettiCannon
+          count={150}
+          origin={{ x: 200, y: 0 }}
+          fallSpeed={3000}
+          fadeOut={true}
+        />
+      )}
+
+      {completionMessage && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F8F8",
+    backgroundColor: "#0d0d0d",
   },
   map: {
     flex: 1,
@@ -194,7 +313,45 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     textAlignVertical: "center",
-    color: "gray",
+    color: "#aaa",
+    backgroundColor: "#0d0d0d",
+  },
+  overlay: {
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    zIndex: 999,
+  },
+  overlayText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  banner: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  bannerText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

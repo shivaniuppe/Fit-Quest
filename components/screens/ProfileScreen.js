@@ -1,50 +1,78 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
-import { doc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../../firebaseConfig";
+import { doc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { ProgressBar } from "react-native-paper";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getLevelFromXP, getXPForNextLevel } from "../utils/levelUtils"; 
+import { checkAndAwardAchievements } from "../utils/awardAchievements";
+import { FontAwesome5 } from '@expo/vector-icons';
+import { signOut, onAuthStateChanged } from "firebase/auth";
 
 const ProfileScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [allAchievements, setAllAchievements] = useState([]);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    if (!auth.currentUser) {
-      setLoading(false);
-      return;
-    }
+    let unsubscribeFirestore = () => {};
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      setUserData(null);
+      unsubscribeFirestore();
 
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    const unsubscribe = onSnapshot(userRef, (doc) => {
+      if (!user) {
+        setLoading(false);
+        navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+        return;
+      }
+
       try {
-        if (doc.exists()) {
-          setUserData(doc.data());
-        } else {
-          console.log("User data not found");
-        }
+        const userRef = doc(db, "users", user.uid);
+        unsubscribeFirestore = onSnapshot(userRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserData(data);
+            await checkAndAwardAchievements(userRef, data, data.achievements);
+          }
+          setLoading(false);
+        }, (error) => {
+          if (error.code === "permission-denied") {
+            console.log("Access to user data denied");
+            setUserData(null);
+          }
+          setLoading(false);
+        });
+
+        const snapshot = await getDocs(collection(db, "masterAchievements"));
+        setAllAchievements(snapshot.docs.map(doc => doc.data()));
       } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
+        console.error("Error initializing profile:", error);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribeFirestore();
+      unsubAuth();
+    };
+  }, [navigation]);
 
-  if (loading) {
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error logging out:", error);
+      setIsLoggingOut(false);
+    }
+  };
+
+  if (loading || !userData) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  if (!userData) {
-    return (
-      <View style={styles.container}>
-        <Text style={{ color: "black", textAlign: "center" }}>No user data found.</Text>
       </View>
     );
   }
@@ -54,47 +82,45 @@ const ProfileScreen = ({ navigation }) => {
     level = 1,
     title = "Beginner",
     xp = 0,
-    xpGoal = 1000,
-    achievements = [],
-    workouts = 0,
+    achievements = {},
+    quests = 0,
     streak = 0,
     caloriesBurned = 0,
-    profilePic,         // Old field name (URL)
+    profilePic,
     profilePicBase64, 
     bio = "",
   } = userData;
 
-  const progress = xpGoal > 0 ? Math.min(xp / xpGoal, 1) : 0;
+  const currentLevel = getLevelFromXP(xp);
+  const xpForCurrentLevel = getXPForNextLevel(currentLevel - 1) || 0;
+  const xpForNextLevel = getXPForNextLevel(currentLevel);
+  const xpProgress = (xpForNextLevel - xpForCurrentLevel) > 0
+    ? (xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)
+    : 0;
   const profilePicture = profilePicBase64 || profilePic || null;
 
-  const achievementData = [
-    { title: "100 Workouts", icon: "🏅" },
-    { title: "30 Day Streak", icon: "🔥" },
-    { title: "Weight Master", icon: "🏋️" },
-    { title: "Cardio King", icon: "❤️" },
-    { title: "Marathon Pro", icon: "🏃" },
-    { title: "Elite Status", icon: "🏆" },
-  ];
+  const achievementList = allAchievements.map((ach) => ({
+    ...ach,
+    unlocked: !!achievements[ach.title],
+  }));
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+     
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
-          <Ionicons name="settings-outline" size={24} color="white" />
-        </TouchableOpacity>
+        <FontAwesome5 name="running" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+        <Text style={styles.headerTitle}>Adventurer's Stats</Text>
       </View>
+
+
 
       <View style={styles.profileContainer}>
         <View style={styles.profileImageContainer}>
           {profilePicture ? (
-            <Image 
-              source={{ uri: profilePicture }} 
-              style={styles.profileImage} 
-            />
+            <Image source={{ uri: profilePicture }} style={styles.profileImage} />
           ) : (
             <View style={[styles.profileImage, styles.profilePlaceholder]}>
-              <FontAwesome name="user-circle" size={50} color="#aaa" />
+              <Ionicons name="person-circle" size={50} color="#aaa" />
             </View>
           )}
           <View style={styles.levelBadge}>
@@ -108,28 +134,31 @@ const ProfileScreen = ({ navigation }) => {
 
       <View style={styles.xpContainer}>
         <Text style={styles.xpText}>XP Progress</Text>
-        <Text style={styles.xpValue}>
-          {xp.toLocaleString()} / {xpGoal.toLocaleString()}
-        </Text>
+        <Text style={styles.xpValue}>{xp.toLocaleString()} / {xpForNextLevel.toLocaleString()}</Text>
       </View>
-      <ProgressBar progress={progress} color="#4CAF50" style={styles.progressBar} />
+      <ProgressBar progress={xpProgress} color="#4CAF50" style={styles.progressBar} />
 
       <Text style={styles.sectionTitle}>Achievements</Text>
       <FlatList
-        data={achievementData}
-        keyExtractor={(item) => item.title}
+        data={achievementList}
+        keyExtractor={(item) => item.id}
         numColumns={3}
         renderItem={({ item }) => (
           <View style={styles.achievementItem}>
-            <Text style={styles.achievementIcon}>{item.icon}</Text>
-            <Text style={styles.achievementText}>{item.title}</Text>
+            <FontAwesome5
+              name={item.icon}
+              size={24}
+              color={item.unlocked ? "#4CAF50" : "#888"}
+              style={styles.achievementIcon}
+            />
+            <Text style={[styles.achievementText, { opacity: item.unlocked ? 1 : 0.3 }]}>{item.title}</Text>
           </View>
         )}
       />
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{workouts}</Text>
+          <Text style={styles.statNumber}>{quests}</Text>
           <Text style={styles.statLabel}>Workouts</Text>
         </View>
         <View style={styles.statItem}>
@@ -137,141 +166,55 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.statLabel}>Days Streak</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{caloriesBurned}k</Text>
+          <Text style={styles.statNumber}>{caloriesBurned}</Text>
           <Text style={styles.statLabel}>Cal Burned</Text>
         </View>
       </View>
-    </View>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#121212", 
-    padding: 20 
+  container: { flex: 1, backgroundColor: "#121212", padding: 20 },
+  header: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginBottom: 20 },
+  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#FFFFFF" },
+  profileContainer: { alignItems: "center", marginBottom: 20 },
+  profileImageContainer: { position: "relative", marginBottom: 10 },
+  profileImage: { width: 100, height: 100, borderRadius: 50 },
+  profilePlaceholder: { backgroundColor: "#333", justifyContent: "center", alignItems: "center" },
+  levelBadge: { position: "absolute", bottom: 0, right: 0, backgroundColor: "#4CAF50", borderRadius: 12, padding: 5, minWidth: 40, alignItems: "center" },
+  levelText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  username: { fontSize: 18, fontWeight: "bold", color: "#FFFFFF" },
+  userTitle: { fontSize: 14, color: "#AAAAAA", marginBottom: 5 },
+  bioText: { fontSize: 14, color: "#DDDDDD", textAlign: "center", maxWidth: "80%" },
+  xpContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  xpText: { fontSize: 14, color: "#BBBBBB" },
+  xpValue: { fontSize: 14, fontWeight: "bold", color: "#FFFFFF" },
+  progressBar: { height: 8, borderRadius: 5, backgroundColor: "#333", marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10, color: "#FFFFFF" },
+  achievementItem: { flex: 1, alignItems: "center", marginBottom: 20, padding: 5 },
+  achievementIcon: { fontSize: 24, marginBottom: 5 },
+  achievementText: { fontSize: 12, color: "#BBBBBB", textAlign: "center" },
+  statsContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, paddingHorizontal: 20 },
+  statItem: { alignItems: "center", flex: 1 },
+  statNumber: { fontSize: 18, fontWeight: "bold", color: "#FFFFFF" },
+  statLabel: { fontSize: 12, color: "#BBBBBB" },
+  logoutButton: {
+    marginTop: 30,
+    backgroundColor: "#FF5252",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
   },
-  header: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center", 
-    marginBottom: 20 
-  },
-  headerTitle: { 
-    fontSize: 22, 
-    fontWeight: "bold", 
-    color: "#FFFFFF" 
-  },
-  profileContainer: { 
-    alignItems: "center", 
-    marginBottom: 20 
-  },
-  profileImageContainer: { 
-    position: "relative", 
-    marginBottom: 10 
-  },
-  profileImage: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50 
-  },
-  profilePlaceholder: { 
-    backgroundColor: "#333", 
-    justifyContent: "center", 
-    alignItems: "center" 
-  },
-  levelBadge: { 
-    position: "absolute", 
-    bottom: 0, 
-    right: 0,
-    backgroundColor: "#4CAF50", 
-    borderRadius: 12, 
-    padding: 5,
-    minWidth: 40,
-    alignItems: "center"
-  },
-  levelText: { 
-    color: "white", 
-    fontSize: 12, 
-    fontWeight: "bold" 
-  },
-  username: { 
-    fontSize: 18, 
-    fontWeight: "bold", 
-    color: "#FFFFFF" 
-  },
-  userTitle: { 
-    fontSize: 14, 
-    color: "#AAAAAA", 
-    marginBottom: 5 
-  },
-  bioText: { 
-    fontSize: 14, 
-    color: "#DDDDDD", 
-    textAlign: "center", 
-    maxWidth: "80%" 
-  },
-  xpContainer: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    marginBottom: 10 
-  },
-  xpText: { 
-    fontSize: 14, 
-    color: "#BBBBBB" 
-  },
-  xpValue: { 
-    fontSize: 14, 
-    fontWeight: "bold", 
-    color: "#FFFFFF" 
-  },
-  progressBar: { 
-    height: 8, 
-    borderRadius: 5, 
-    backgroundColor: "#333", 
-    marginBottom: 20 
-  },
-  sectionTitle: { 
-    fontSize: 16, 
-    fontWeight: "bold", 
-    marginBottom: 10, 
-    color: "#FFFFFF" 
-  },
-  achievementItem: { 
-    flex: 1, 
-    alignItems: "center", 
-    marginBottom: 20, 
-    padding: 5 
-  },
-  achievementIcon: { 
-    fontSize: 24, 
-    marginBottom: 5 
-  },
-  achievementText: { 
-    fontSize: 12, 
-    color: "#BBBBBB", 
-    textAlign: "center" 
-  },
-  statsContainer: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    marginTop: 20, 
-    paddingHorizontal: 20 
-  },
-  statItem: { 
-    alignItems: "center", 
-    flex: 1 
-  },
-  statNumber: { 
-    fontSize: 18, 
-    fontWeight: "bold", 
-    color: "#FFFFFF" 
-  },
-  statLabel: { 
-    fontSize: 12, 
-    color: "#BBBBBB" 
+  logoutText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
-
 
 export default ProfileScreen;

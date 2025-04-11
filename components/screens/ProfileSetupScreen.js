@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image, ActivityIndicator } from "react-native";
 import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "/Users/shivaniuppe/Desktop/Fit-Quest/firebaseConfig.js";
+import { db } from "../../firebaseConfig";
 import { FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ProfileSetupScreen = ({ route, navigation }) => {
   const { userId, email } = route.params;
@@ -121,25 +122,38 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         quests: 0,
         streak: 0,
         caloriesBurned: 0,
-        achievements: [],
+        achievements: {},
+        questsThisWeek: 0,
+        activeMinutesToday: 0,
+        activeDaysStreak: 0,
+        cyclingDistance: 0,       // in kilometers
+        runningDistance: 0,
+        lastActiveDay: new Date().toISOString().split("T")[0],
+        lastQuestReset: new Date().toISOString().split('T')[0],
+        loggedDays: 0,
+        lastLoggedDay: "",
+        profileComplete: name.trim() !== "" && profilePic && bio.trim() !== "",
         createdAt: new Date().toISOString(),
         lastActive: new Date().toISOString(),
       }, { merge: true });
 
-      navigation.navigate("Home");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });      
       await AsyncStorage.removeItem("stepsToday");
       await AsyncStorage.removeItem("baseStepCount");
 
     } catch (err) {
       console.error("Profile setup error:", err);
-      setError(err.message || "Failed to save profile. Try a smaller image.");
+      setError(err?.message?.toString() || "Something went wrong. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>FitQuest</Text>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -196,7 +210,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
           <Text style={styles.saveButtonText}>Save Profile</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
