@@ -10,7 +10,7 @@ const QuestsScreen = ({ navigation }) => {
   const [quests, setQuests] = useState([]);
   const [acceptedQuests, setAcceptedQuests] = useState([]);
   const [activeTab, setActiveTab] = useState("available"); 
-  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -44,7 +44,7 @@ const QuestsScreen = ({ navigation }) => {
     const unsubscribe = onSnapshot(
       userQuestsQuery,
       (querySnapshot) => {
-        if (!auth.currentUser) return; // 🛡️ Extra guard
+        if (!auth.currentUser) return; 
         const acceptedQuestsData = querySnapshot.docs.map((doc) => ({
           questId: doc.data().questId,
           status: doc.data().status,
@@ -64,8 +64,6 @@ const QuestsScreen = ({ navigation }) => {
     return () => unsubscribe();
   }, [isLoggedIn]);
   
-
-  // Separate quests into available and accepted
   const availableQuests = quests.filter(
     (quest) => !acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === quest.id)
   );
@@ -73,7 +71,6 @@ const QuestsScreen = ({ navigation }) => {
     acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === quest.id)
   );
 
-  // Render the appropriate list based on the active tab
   const renderQuests = () => {
     if (activeTab === "available") {
       return (
@@ -101,17 +98,14 @@ const QuestsScreen = ({ navigation }) => {
                   const userQuestRef = doc(db, "userQuests", `${userId}_${item.id}`);
 
                   try {
-                    // Add the quest to the userQuests collection
                     await setDoc(userQuestRef, {
                       userId,
                       questId: item.id,
                       status: "accepted",
-                      progress: 0, // Initial progress
                       startedAt: new Date().toISOString(),
                       completedAt: null,
                     });
 
-                    // Update the local state
                     setAcceptedQuests([...acceptedQuests, { questId: item.id, status: "accepted" }]);
                     alert("Quest accepted!");
                   } catch (error) {
@@ -132,7 +126,6 @@ const QuestsScreen = ({ navigation }) => {
           data={acceptedQuestsList}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            // Find the status of the quest
             const questStatus = acceptedQuests.find(
               (acceptedQuest) => acceptedQuest.questId === item.id
             )?.status;
@@ -167,16 +160,12 @@ const QuestsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* Header Section */}
 
-      {/* Title */}
       <View style={styles.headerCentered}>
         <FontAwesome5 name="scroll" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.title}>Select Your Quest</Text>
       </View>
 
-
-      {/* Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === "available" && styles.activeTab]}
@@ -192,7 +181,6 @@ const QuestsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Quest List */}
       {renderQuests()}
     </SafeAreaView>
   );

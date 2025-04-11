@@ -1,7 +1,6 @@
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
-// type should be either "cyclingDistance" or "runningDistance"
 export const updateDistanceStat = async (userId, distanceInKm, type) => {
   const userRef = doc(db, "users", userId);
   const snap = await getDoc(userRef);

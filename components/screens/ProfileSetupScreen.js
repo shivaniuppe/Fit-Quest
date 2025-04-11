@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Keyboard } from "react-native";
 
 const ProfileSetupScreen = ({ route, navigation }) => {
   const { userId, email } = route.params;
@@ -29,21 +30,18 @@ const ProfileSetupScreen = ({ route, navigation }) => {
 
   const processAndCompressImage = async (uri) => {
     try {
-      // First resize the image
       const resizedImage = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 500, height: 500 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
-      // Then convert to Base64
       const base64 = await FileSystem.readAsStringAsync(resizedImage.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Check size (Firestore document limit is 1MB)
-      const sizeInBytes = (base64.length * 3) / 4; // Approximate byte size
-      if (sizeInBytes > 900000) { // ~0.9MB safety margin
+      const sizeInBytes = (base64.length * 3) / 4; 
+      if (sizeInBytes > 900000) { 
         throw new Error("Image is too large after compression");
       }
 
@@ -103,10 +101,8 @@ const ProfileSetupScreen = ({ route, navigation }) => {
     setError("");
 
     try {
-      // Process and compress the image
       const base64Image = await processAndCompressImage(profilePic);
       
-      // Save to Firestore
       await setDoc(doc(db, "users", userId), {
         userId,
         username: name,
@@ -154,7 +150,11 @@ const ProfileSetupScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>FitQuest</Text>
+      <View style={styles.header}>
+        <Image source={require("../../assets/fit-quest-logo.png")} style={styles.logo} />
+        <Text style={styles.title}>FitQuest</Text>
+      </View>
+
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -164,7 +164,10 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         placeholderTextColor="#aaa"
         value={name}
         onChangeText={setName}
+        returnKeyType="done"
+        onSubmitEditing={Keyboard.dismiss}
       />
+
 
       <View style={styles.profilePicContainer}>
         {profilePic ? (
@@ -195,9 +198,16 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         placeholder="Bio (Optional)"
         placeholderTextColor="#aaa"
         value={bio}
-        onChangeText={setBio}
-        multiline
+        onChangeText={(text) => {
+          if (text.length <= 100) setBio(text);
+        }}
+        maxLength={100}
+        returnKeyType="done"
+        onSubmitEditing={() => {
+          Keyboard.dismiss
+        }}
       />
+      <Text style={styles.charCount}>{bio.length}/100</Text>
 
       <TouchableOpacity 
         style={styles.saveButton} 
@@ -221,12 +231,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 24,
-    color: "white",
-    fontWeight: "bold",
-    marginBottom: 30,
   },
   input: {
     width: "100%",
@@ -280,6 +284,27 @@ const styles = StyleSheet.create({
     color: "red",
     marginBottom: 10,
   },
+  charCount: {
+    color: "#888",
+    fontSize: 12,
+    alignSelf: "flex-end",
+    marginBottom: 10,
+  },  
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 24,
+    color: "white",
+    fontWeight: "bold",
+  },  
 });
 
 export default ProfileSetupScreen;

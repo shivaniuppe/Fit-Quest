@@ -412,15 +412,11 @@ export const uploadQuests = async () => {
     const questsRef = collection(db, "quests");
 
     for (const quest of sampleQuests) {
-      // Check if the quest already exists
       const querySnapshot = await getDocs(query(questsRef, where("title", "==", quest.title)));
-      
       if (!querySnapshot.empty) {
         console.log(`Quest "${quest.title}" already exists. Skipping.`);
         continue;
       }
-
-      // Add the quest if it does not exist
       await addDoc(questsRef, quest);
       console.log(`Quest "${quest.title}" added successfully!`);
     }

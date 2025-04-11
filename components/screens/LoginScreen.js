@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../../firebaseConfig";
-import { FontAwesome } from "@expo/vector-icons";
+import { auth } from "../../firebaseConfig";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,10 +24,11 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* App Logo */}
-      <Text style={styles.title}>FitQuest</Text>
+      <View style={styles.header}>
+        <Image source={require("../../assets/fit-quest-logo.png")} style={styles.logo} />
+        <Text style={styles.title}>FitQuest</Text>
+      </View>
 
-      {/* Email Input */}
       <TextInput 
         style={styles.input} 
         placeholder="Email" 
@@ -37,7 +37,6 @@ export default function LoginScreen({ navigation }) {
         onChangeText={setEmail} 
       />
 
-      {/* Password Input */}
       <TextInput 
         style={styles.input} 
         placeholder="Password" 
@@ -47,20 +46,16 @@ export default function LoginScreen({ navigation }) {
         secureTextEntry 
       />
 
-      {/* Error Message */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {/* Login Button */}
       <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
         <Text style={styles.loginButtonText}>Login</Text>
       </TouchableOpacity>
 
-      {/* Signup Button */}
       <TouchableOpacity style={styles.signupButton} onPress={() => navigation.navigate("Signup")}>
         <Text style={styles.signupButtonText}>Sign Up</Text>
       </TouchableOpacity>
 
-      {/* Forgot Password */}
       <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
         <Text style={styles.forgotPassword}>Forgot password?</Text>
       </TouchableOpacity>
@@ -69,7 +64,6 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -77,17 +71,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-  },
-  logo: {
-    width: 50,
-    height: 50,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    color: "white",
-    fontWeight: "bold",
-    marginBottom: 30,
   },
   input: {
     width: "100%",
@@ -132,5 +115,20 @@ const styles = StyleSheet.create({
     color: "red",
     marginBottom: 10,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 24,
+    color: "white",
+    fontWeight: "bold",
+  },  
 });
 

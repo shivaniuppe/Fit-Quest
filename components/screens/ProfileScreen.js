@@ -119,8 +119,6 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Adventurer's Stats</Text>
       </View>
 
-
-
       <View style={styles.profileContainer}>
         <View style={styles.profileImageContainer}>
           {profilePicture ? (

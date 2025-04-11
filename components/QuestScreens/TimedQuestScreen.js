@@ -71,7 +71,6 @@ const TimedQuestScreen = () => {
       await updateDoc(userQuestRef, {
         status: 'completed',
         completedAt: serverTimestamp(),
-        progress: 1,
       });
 
       const questSnap = await getDoc(questRef);

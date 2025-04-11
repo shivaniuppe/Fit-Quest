@@ -2,7 +2,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 
 export const updateLoggedDays = async (userId) => {
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const today = new Date().toISOString().split("T")[0];
   const userRef = doc(db, "users", userId);
   const snap = await getDoc(userRef);
   if (!snap.exists()) return;
@@ -15,7 +15,7 @@ export const updateLoggedDays = async (userId) => {
 
   if (lastDay === today) {
     console.log("🔁 Already logged today");
-    return; // prevent double logging
+    return; 
   }
 
   const yesterday = new Date();
@@ -23,9 +23,9 @@ export const updateLoggedDays = async (userId) => {
   const yesterdayString = yesterday.toISOString().split("T")[0];
 
   if (lastDay === yesterdayString) {
-    newStreak += 1; // consecutive
+    newStreak += 1; 
   } else {
-    newStreak = 1; // reset
+    newStreak = 1; 
   }
 
   await updateDoc(userRef, {

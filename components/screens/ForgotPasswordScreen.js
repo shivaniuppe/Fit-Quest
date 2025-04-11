@@ -19,11 +19,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* App Logo */}
-      {/*<Image source={require("../assets/dumbbell.png")} style={styles.logo} /> */}
       <Text style={styles.title}>Reset Password</Text>
 
-      {/* Email Input */}
       <TextInput
         style={styles.input}
         placeholder="Enter your email"
@@ -32,15 +29,12 @@ export default function ForgotPasswordScreen({ navigation }) {
         onChangeText={setEmail}
       />
 
-      {/* Message Display */}
       {message ? <Text style={styles.messageText}>{message}</Text> : null}
 
-      {/* Reset Password Button */}
       <TouchableOpacity style={styles.resetButton} onPress={handleForgotPassword}>
         <Text style={styles.resetButtonText}>Send Reset Link</Text>
       </TouchableOpacity>
 
-      {/* Back to Login Button */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.backButtonText}>Back to Login</Text>
       </TouchableOpacity>
@@ -48,7 +42,6 @@ export default function ForgotPasswordScreen({ navigation }) {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,5 +1,3 @@
-// utils/levelUtils.js
-
 export const getLevelFromXP = (xp) => {
     const xpThresholds = [0, 100, 250, 450, 700, 1000, 1350, 1750, 2200, 2700];
   
@@ -10,7 +8,6 @@ export const getLevelFromXP = (xp) => {
       return 1;
     }
   
-    // For levels > 10
     let level = 11;
   
     while (true) {

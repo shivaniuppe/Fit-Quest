@@ -1,4 +1,3 @@
-// utils/achievementUtils.js
 import { collection, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 

@@ -14,6 +14,15 @@ export const updateUserStatsOnQuestComplete = async (userId, quest) => {
       return;
     }
 
+    const getTitleFromLevel = (level) => {
+      if (level >= 1 && level < 5) return "Beginner";
+      if (level >= 5 && level < 10) return "Explorer";
+      if (level >= 10 && level < 15) return "Adventurer";
+      if (level >= 15 && level < 20) return "Warrior";
+      if (level >= 20) return "Champion";
+      return "Rookie";
+    };
+
     const userData = userSnap.data();
     const currentXP = userData.xp || 0;
     const currentCalories = userData.caloriesBurned || 0;
@@ -22,17 +31,19 @@ export const updateUserStatsOnQuestComplete = async (userId, quest) => {
     const newXP = currentXP + (quest.xp || 0);
     const newCalories = currentCalories + (quest.calories || 0);
     const newLevel = getLevelFromXP(newXP);
+    const newTitle = getTitleFromLevel(newLevel);
 
-    // 🔁 Weekly quest tracking
     const currentWeekStart = getCurrentWeekStart();
     const lastQuestReset = userData.lastQuestReset || "";
     const shouldReset = lastQuestReset !== currentWeekStart;
 
     const newQuestsThisWeek = shouldReset ? 1 : (userData.questsThisWeek || 0) + 1;
+    
 
     await updateDoc(userRef, {
       xp: newXP,
       level: newLevel,
+      title: newTitle,
       caloriesBurned: newCalories,
       quests: currentQuests + 1,
       questsThisWeek: newQuestsThisWeek,

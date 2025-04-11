@@ -11,11 +11,11 @@ const LeaderboardScreen = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user); // true if user exists
+      setIsLoggedIn(!!user); 
     });
 
     return () => unsubscribe();
@@ -31,7 +31,7 @@ const LeaderboardScreen = () => {
     const unsubscribe = onSnapshot(
       usersQuery,
       (querySnapshot) => {
-        if (!auth.currentUser) return; // 🛡️ Prevent processing after logout
+        if (!auth.currentUser) return; 
   
         try {
           const usersData = querySnapshot.docs.map((doc) => ({
@@ -82,7 +82,6 @@ const LeaderboardScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // The data will automatically update via the snapshot listener
     setRefreshing(false);
   };
 
@@ -106,14 +105,11 @@ const LeaderboardScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* Header */}
       <View style={styles.headerCentered}>
         <FontAwesome name="trophy" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.headerTitle}>Top Adventurers</Text>
       </View>
 
-
-      {/* Top 3 Players */}
       <View style={styles.topContainer}>
         {topPlayers.map((player) => (
           <View key={player.id} style={styles.topCard}>
@@ -125,7 +121,6 @@ const LeaderboardScreen = () => {
         ))}
       </View>
 
-      {/* Other Players List */}
       <FlatList
         data={players}
         keyExtractor={(item) => item.id}

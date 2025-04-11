@@ -28,7 +28,6 @@ const WellnessQuestScreen = () => {
       await updateDoc(userQuestRef, {
         status: 'completed',
         completedAt: serverTimestamp(),
-        progress: 1,
       });
 
       const questSnap = await getDoc(questRef);
@@ -37,7 +36,7 @@ const WellnessQuestScreen = () => {
 
         await updateUserStatsOnQuestComplete(userId, questData);
 
-        setShowConfetti(true); // 🎉 Confetti
+        setShowConfetti(true); 
 
         setTimeout(() => {
           navigation.navigate("Home");

@@ -33,7 +33,7 @@ const MapQuestScreen = ({ route }) => {
   const estimateDurationFromGoal = (goal) => {
     if (goal.toLowerCase().includes("km")) {
       const km = parseFloat(goal.replace("km", ""));
-      return Math.round(km * 6); // ~6 minutes per km
+      return Math.round(km * 6); 
     } else {
       const steps = parseInt(goal);
       const avgStepsPerMin = 80;
@@ -122,7 +122,7 @@ const MapQuestScreen = ({ route }) => {
     navigation.navigate("JourneyScreen", { destination, quest });
   };
 
-  const estimatedTime = estimateDurationFromGoal(quest.goal); // dynamic duration
+  const estimatedTime = estimateDurationFromGoal(quest.goal); 
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

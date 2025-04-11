@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
-import { FontAwesome } from "@expo/vector-icons"; 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignupScreen({ navigation }) {
@@ -12,11 +11,9 @@ export default function SignupScreen({ navigation }) {
 
   const handleSignup = async () => {
     try {
-      // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
   
-      // Navigate to Profile Setup screen
       navigation.navigate("ProfileSetup", {
         userId: user.uid,
         email: user.email,
@@ -28,11 +25,11 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* App Logo */}
-     {/* <Image source={require("../assets/dumbbell.png")} style={styles.logo} /> */}
-      <Text style={styles.title}>FitQuest</Text>
+      <View style={styles.header}>
+        <Image source={require("../../assets/fit-quest-logo.png")} style={styles.logo} />
+        <Text style={styles.title}>FitQuest</Text>
+      </View>
 
-      {/* Email Input */}
       <TextInput 
         style={styles.input} 
         placeholder="Email" 
@@ -41,7 +38,6 @@ export default function SignupScreen({ navigation }) {
         onChangeText={setEmail} 
       />
 
-      {/* Password Input */}
       <TextInput 
         style={styles.input} 
         placeholder="Password" 
@@ -51,15 +47,12 @@ export default function SignupScreen({ navigation }) {
         secureTextEntry 
       />
 
-      {/* Error Message */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {/* Sign Up Button */}
       <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
         <Text style={styles.signupButtonText}>Sign Up</Text>
       </TouchableOpacity>
 
-      {/* Go to Login Button */}
       <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.loginButtonText}>Login</Text>
       </TouchableOpacity>
@@ -67,7 +60,6 @@ export default function SignupScreen({ navigation }) {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -75,17 +67,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-  },
-  logo: {
-    width: 50,
-    height: 50,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    color: "white",
-    fontWeight: "bold",
-    marginBottom: 30,
   },
   input: {
     width: "100%",
@@ -126,5 +107,20 @@ const styles = StyleSheet.create({
     color: "red",
     marginBottom: 10,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 24,
+    color: "white",
+    fontWeight: "bold",
+  },  
 });
 
