@@ -5,11 +5,13 @@ import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
 import { useNavigation } from "@react-navigation/native";
 import { GOOGLE_API_KEY } from "../../secrets";
-import { doc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, getDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../../firebaseConfig";
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { updateUserStatsOnQuestComplete } from "../utils/userStats";
 import { updateDistanceStat } from "../utils/updateDistanceStat";
+import { Alert, TouchableOpacity } from "react-native";
+import AbandonQuestModal from "../utils/AbandonQuestModal";
 
 const darkMapStyle = [
   {
@@ -104,6 +106,7 @@ const JourneyScreen = ({ route }) => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [questCompleted, setQuestCompleted] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   const origin = useMemo(() => {
     if (!location) return null;
@@ -234,8 +237,21 @@ const JourneyScreen = ({ route }) => {
       }
     } catch (error) {
       console.error("❌ Error completing run quest:", error);
-    }
+    }   
   };
+  const handleAbandonQuest = async () => {
+    try {
+      const userId = auth.currentUser?.uid;
+      const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
+      await deleteDoc(userQuestRef);
+      setShowAbandonModal(false);
+      alert("Quest abandoned. It'll return to the available quests.");
+      navigation.navigate("Home", { screen: "Quests" }); 
+    } catch (error) {
+      console.error("Error abandoning quest:", error);
+      Alert.alert("Error", "Could not abandon quest. Try again.");
+    }
+  }; 
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -297,6 +313,32 @@ const JourneyScreen = ({ route }) => {
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
+      {!questCompleted && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 100,
+            left: 20,
+            right: 20,
+            backgroundColor: '#cc3333',
+            paddingVertical: 14,
+            borderRadius: 10,
+            alignItems: 'center',
+          }}
+          onPress={() => setShowAbandonModal(true)}
+        >
+          <Text style={{ color: 'white', fontSize: 15, fontWeight: '500' }}>Abandon Quest</Text>
+        </TouchableOpacity>
+      )}
+
+
+      <AbandonQuestModal
+        visible={showAbandonModal}
+        questTitle={quest?.title}
+        onCancel={() => setShowAbandonModal(false)}
+        onConfirm={handleAbandonQuest}
+      />
+
     </SafeAreaView>
   );
 };

@@ -4,10 +4,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Progress from 'react-native-progress';
 import { auth, db } from "../../firebaseConfig";
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { updateUserStatsOnQuestComplete } from "../utils/userStats";
 import { updateActiveMinutes } from '../utils/updateActiveMinutes';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import AbandonQuestModal from "../utils/AbandonQuestModal";
 
 const TimedQuestScreen = () => {
   const navigation = useNavigation();
@@ -20,6 +21,7 @@ const TimedQuestScreen = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
   const timerRef = useRef(null);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   useEffect(() => {
     const loadSavedTimer = async () => {
@@ -97,12 +99,12 @@ const TimedQuestScreen = () => {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.innerContainer}>
         <Text style={styles.title}>{quest.title}</Text>
-
+  
         <View style={styles.infoRow}>
           <FontAwesome5 name={quest.icon} size={20} color="#FFD700" style={styles.icon} />
           <Text style={styles.goalText}>Duration: {quest.goal}</Text>
         </View>
-
+  
         <View style={styles.timerContainer}>
           <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
           <Progress.Bar
@@ -115,7 +117,7 @@ const TimedQuestScreen = () => {
             style={{ marginTop: 16 }}
           />
         </View>
-
+  
         {!isRunning ? (
           <TouchableOpacity style={styles.startButton} onPress={handleStartTimer}>
             <Text style={styles.buttonText}>Start Timer</Text>
@@ -127,17 +129,46 @@ const TimedQuestScreen = () => {
         ) : (
           <Text style={styles.runningText}>Timer is running...</Text>
         )}
-      </View>
+  
+          {timeLeft > 0 && (
+          <TouchableOpacity
+            style={[styles.completeButton, { backgroundColor: "#cc3333", marginTop: 20 }]}
+            onPress={() => setShowAbandonModal(true)}
+          >
+            <Text style={styles.buttonText}>Abandon Quest</Text>
+          </TouchableOpacity>
+        )}
 
+      </View>
+  
       {showConfetti && (
         <ConfettiCannon count={80} origin={{ x: 180, y: -20 }} fadeOut />
       )}
-
+  
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
+  
+      <AbandonQuestModal
+        visible={showAbandonModal}
+        questTitle={quest?.title}
+        onCancel={() => setShowAbandonModal(false)}
+        onConfirm={async () => {
+          try {
+            const userId = auth.currentUser?.uid;
+            const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
+            await updateDoc(userQuestRef, { status: "abandoned" });
+            await deleteDoc(userQuestRef); 
+            setShowAbandonModal(false);
+            alert("Quest abandoned. It'll return to the available quests.");
+            navigation.navigate("Home", { screen: "Quests" }); 
+          } catch (err) {
+            console.error("Error abandoning timed quest:", err);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };

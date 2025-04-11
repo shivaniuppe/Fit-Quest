@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from "../../firebaseConfig";
 import { updateUserStatsOnQuestComplete } from "../utils/userStats";
 import ConfettiCannon from 'react-native-confetti-cannon';
+import AbandonQuestModal from "../utils/AbandonQuestModal";
 
 const WellnessQuestScreen = () => {
   const navigation = useNavigation();
@@ -15,11 +16,13 @@ const WellnessQuestScreen = () => {
   const [checkedOff, setCheckedOff] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
-
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const handleCompleteQuest = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || isCompleting) return;
 
+    setIsCompleting(true);
     const userId = auth.currentUser.uid;
     const userQuestRef = doc(db, 'userQuests', `${userId}_${quest.id}`);
     const questRef = doc(db, 'quests', quest.id);
@@ -43,11 +46,11 @@ const WellnessQuestScreen = () => {
         }, 2500);      
         
         setCompletionMessage(`+${questData.xp} XP · ${questData.calories} kcal burned`);
-
       }
     } catch (error) {
       console.error('❌ Error completing wellness quest:', error);
       Alert.alert('Error', 'Could not complete quest. Please try again.');
+      setIsCompleting(false);
     }
   };
 
@@ -67,9 +70,10 @@ const WellnessQuestScreen = () => {
 
         <TouchableOpacity
           style={[styles.checkButton, checkedOff && styles.checked]}
-          onPress={() => setCheckedOff(!checkedOff)}
+          onPress={() => setCheckedOff(true)}
+          disabled={checkedOff}
         >
-          <Text style={styles.checkButtonText}>
+          <Text style={styles.buttonText}>
             {checkedOff ? '✔ Marked as Done' : 'Mark as Done'}
           </Text>
         </TouchableOpacity>
@@ -78,8 +82,18 @@ const WellnessQuestScreen = () => {
           <TouchableOpacity
             style={styles.completeButton}
             onPress={handleCompleteQuest}
+            disabled={isCompleting}
           >
             <Text style={styles.buttonText}>Complete Quest</Text>
+          </TouchableOpacity>
+        )}
+
+        {!checkedOff && (
+          <TouchableOpacity 
+            style={styles.abandonButton} 
+            onPress={() => setShowAbandonModal(true)}
+          >
+            <Text style={styles.buttonText}>Abandon Quest</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -87,12 +101,31 @@ const WellnessQuestScreen = () => {
       {showConfetti && (
         <ConfettiCannon count={80} origin={{ x: 180, y: -20 }} fadeOut />
       )}
+
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
 
+      <AbandonQuestModal
+        visible={showAbandonModal}
+        questTitle={quest?.title}
+        onCancel={() => setShowAbandonModal(false)}
+        onConfirm={async () => {
+          try {
+            const userId = auth.currentUser?.uid;
+            const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
+            await deleteDoc(userQuestRef);
+            setShowAbandonModal(false);
+            alert("Quest abandoned. It'll return to the available quests.");
+            navigation.navigate("Home", { screen: "Quests" }); 
+          } catch (error) {
+            console.error("Error abandoning quest:", error);
+            Alert.alert("Error", "Could not abandon quest. Try again.");
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -131,32 +164,42 @@ const styles = StyleSheet.create({
   },
   checkButton: {
     backgroundColor: '#333',
-    padding: 14,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
     alignItems: 'center',
     marginBottom: 20,
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   checked: {
     backgroundColor: '#4CAF50',
   },
-  checkButtonText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '500',
-  },
   completeButton: {
-    backgroundColor: '#00CC99',
-    padding: 14,
-    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
     alignItems: 'center',
+    width: '80%',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '500',
+  abandonButton: {
+    backgroundColor: '#cc3333',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    alignItems: 'center',
+    width: '80%',
   },
   innerContainer: {
     flex: 1,
@@ -165,33 +208,6 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingHorizontal: 20,
   },
-  checkButton: {
-    backgroundColor: '#333',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 20,
-    width: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  completeButton: {
-    backgroundColor: '#00CC99',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    alignItems: 'center',
-    width: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },  
   banner: {
     position: 'absolute',
     bottom: 40,
@@ -213,5 +229,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     textAlign: 'center',
-  },  
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '500',
+  }
 });

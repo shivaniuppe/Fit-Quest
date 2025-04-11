@@ -19,6 +19,7 @@ import { getLevelFromXP, getXPForNextLevel } from '../utils/levelUtils';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { onAuthStateChanged } from "firebase/auth";
+import AbandonQuestModal from "../utils/AbandonQuestModal";
 
 const MainHomeScreen = () => {
   const [steps, setSteps] = useState(0);
@@ -633,8 +634,8 @@ useEffect(() => {
       {acceptedQuests.length > 0 ? (
         <FlatList
           data={[...acceptedQuests].sort((a, b) => {
-            const aTime = a.acceptedAt?.seconds || 0;
-            const bTime = b.acceptedAt?.seconds || 0;
+            const aTime = a.acceptedAt?.seconds ?? 0;
+            const bTime = b.acceptedAt?.seconds ?? 0;
             return bTime - aTime; 
           })}
           keyExtractor={(item) => item.id}
@@ -694,32 +695,16 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       )}
-      {showAbandonModal && (
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalBox}>
-          <Text style={styles.modalText}>
-            Are you sure you want to abandon "{questToAbandon?.title}"?
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setShowAbandonModal(false);
-                setQuestToAbandon(null);
-              }}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmAbandonButton}
-              onPress={handleAbandonQuest}
-            >
-              <Text style={styles.buttonText}>Yes, Abandon</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    )}
+      <AbandonQuestModal
+        visible={showAbandonModal}
+        questTitle={questToAbandon?.title}
+        onCancel={() => {
+          setShowAbandonModal(false);
+          setQuestToAbandon(null);
+        }}
+        onConfirm={handleAbandonQuest}
+      />
+
 
     </SafeAreaView>
   
@@ -990,52 +975,6 @@ const styles = StyleSheet.create({
   },
   loadingIndicator: {
     marginVertical: 8
-  },
-  modalOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  modalBox: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 12,
-    padding: 20,
-    width: "80%",
-    alignItems: "center",
-  },
-  modalText: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 20,
-    textAlign: "center",
-    color: "#FFFFFF"
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  cancelButton: {
-    backgroundColor: "#757575",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 6,
-    alignItems: "center",
-  },
-  confirmAbandonButton: {
-    backgroundColor: "#FF5722",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginLeft: 6,
-    alignItems: "center",
   },
   topBarCombined: {
     flexDirection: "row",

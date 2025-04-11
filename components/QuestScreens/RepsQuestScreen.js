@@ -3,10 +3,13 @@ import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-na
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Progress from 'react-native-progress';
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { auth, db } from "../../firebaseConfig";
 import { updateUserStatsOnQuestComplete } from "../utils/userStats";
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { Alert } from 'react-native';
+import AbandonQuestModal from "../utils/AbandonQuestModal";
+
 
 const RepsQuestScreen = () => {
   const navigation = useNavigation();
@@ -20,6 +23,7 @@ const RepsQuestScreen = () => {
   const [setsCompleted, setSetsCompleted] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   const repsDone = setsCompleted * repsPerSet;
   const progress = Math.min(repsDone / totalReps, 1);
@@ -95,16 +99,23 @@ const RepsQuestScreen = () => {
           <Text style={styles.buttonText}>Complete Set (+{repsPerSet} reps)</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.completeButton,
-            repsDone < totalReps && styles.disabledButton
-          ]}
-          onPress={handleCompleteQuest}
-          disabled={repsDone < totalReps}
-        >
-          <Text style={styles.buttonText}>Complete Quest</Text>
-        </TouchableOpacity>
+        {repsDone >= totalReps ? (
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={handleCompleteQuest}
+          >
+            <Text style={styles.buttonText}>Complete Quest</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.setButton, { backgroundColor: '#cc3333' }]}
+            onPress={() => setShowAbandonModal(true)}
+          >
+            <Text style={styles.buttonText}>Abandon Quest</Text>
+          </TouchableOpacity>
+        )}
+
+
       </View>
 
       {showConfetti && (
@@ -116,6 +127,25 @@ const RepsQuestScreen = () => {
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
+      <AbandonQuestModal
+        visible={showAbandonModal}
+        questTitle={quest?.title}
+        onCancel={() => setShowAbandonModal(false)}
+        onConfirm={async () => {
+          try {
+            const userId = auth.currentUser?.uid;
+            const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
+            await deleteDoc(userQuestRef);
+            setShowAbandonModal(false);
+            alert("Quest abandoned. It'll return to the available quests.");
+            navigation.navigate("Home", { screen: "Quests" }); 
+          } catch (error) {
+            console.error("Error abandoning quest:", error);
+            Alert.alert("Error", "Could not abandon quest. Try again.");
+          }
+        }}
+      />
+
     </SafeAreaView>
   );
 };
