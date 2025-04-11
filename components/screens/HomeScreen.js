@@ -42,6 +42,7 @@ const MainHomeScreen = () => {
   const [questToAbandon, setQuestToAbandon] = useState(null);
   const [stepsTodayBase, setStepsTodayBase] = useState(0);
   const [xp, setXP] = useState(0);
+  const [xpForCurrentLevel, setXpForCurrentLevel] = useState(0);
   const [xpForNextLevel, setXpForNextLevel] = useState(100); 
   const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // track login
 
@@ -226,11 +227,12 @@ useEffect(() => {
   
           const userLevel = getLevelFromXP(currentXP);
           const xpNext = getXPForNextLevel(userLevel);
-          const xpPrev = getXPForNextLevel(userLevel - 1) || 0;
-  
+          const xpPrev = userLevel === 1 ? 0 : getXPForNextLevel(userLevel - 1);
+
           setXP(currentXP);
           setLevel(userLevel);
-          setXpForNextLevel(xpNext - xpPrev);
+          setXpForCurrentLevel(xpPrev);
+          setXpForNextLevel(xpNext);
         }
       };
   
@@ -598,31 +600,33 @@ useEffect(() => {
         <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
         <View style={styles.levelStepsBlock}>
           <Text style={styles.levelText}>Level {level} ⭐</Text>
-            {typeof xp === 'number' && typeof xpForNextLevel === 'number' && (
-    <>
-      {(() => {
-        const prevXP = getXPForNextLevel(level - 1) || 0;
-        const progress = xpForNextLevel > 0 ? (xp - prevXP) / xpForNextLevel : 0;
+          {typeof xp === 'number' && typeof xpForNextLevel === 'number' && typeof xpForCurrentLevel === 'number' && (
+            <>
+              {(() => {
+                const progress = (xpForNextLevel - xpForCurrentLevel) > 0 
+                  ? (xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel) 
+                  : 0;
 
-        return (
-          <>
-            <Progress.Bar 
-              progress={progress}
-              width={160} 
-              height={6}
-              color="#4CAF50" 
-              unfilledColor="#333"
-              borderWidth={0} 
-              style={{ marginBottom: 6 }}
-            />
-            <Text style={{ color: "#AAAAAA", fontSize: 12 }}>
-              {xp} / {getXPForNextLevel(level)} XP
-            </Text>
-          </>
-        );
-      })()}
-    </>
-  )}
+                return (
+                  <>
+                    <Progress.Bar 
+                      progress={progress}
+                      width={160} 
+                      height={6}
+                      color="#4CAF50" 
+                      unfilledColor="#333"
+                      borderWidth={0} 
+                      style={{ marginBottom: 6 }}
+                    />
+                    <Text style={{ color: "#AAAAAA", fontSize: 12 }}>
+                      {xp} / {xpForNextLevel} XP
+                    </Text>
+                  </>
+                );
+              })()}
+            </>
+          )}
+
 
 
 

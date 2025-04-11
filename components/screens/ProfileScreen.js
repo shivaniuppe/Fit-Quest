@@ -92,17 +92,24 @@ const ProfileScreen = ({ navigation }) => {
   } = userData;
 
   const currentLevel = getLevelFromXP(xp);
-  const xpForCurrentLevel = getXPForNextLevel(currentLevel - 1) || 0;
   const xpForNextLevel = getXPForNextLevel(currentLevel);
-  const xpProgress = (xpForNextLevel - xpForCurrentLevel) > 0
+  const xpForCurrentLevel = currentLevel === 1 ? 0 : getXPForNextLevel(currentLevel - 1);
+
+  const xpProgress = xpForNextLevel > xpForCurrentLevel
     ? (xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)
     : 0;
+
   const profilePicture = profilePicBase64 || profilePic || null;
 
-  const achievementList = allAchievements.map((ach) => ({
-    ...ach,
-    unlocked: !!achievements[ach.title],
-  }));
+  const achievementList = allAchievements
+    .map((ach) => ({
+      ...ach,
+      unlocked: !!achievements[ach.title],
+    }))
+    .sort((a, b) => {
+      if (a.unlocked === b.unlocked) return 0;
+      return a.unlocked ? -1 : 1;
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
