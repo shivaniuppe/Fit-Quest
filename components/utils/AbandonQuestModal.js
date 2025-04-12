@@ -1,14 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 
+/**
+ * A reusable modal component to confirm quest abandonment
+ * 
+ * Props:
+ * - visible: Boolean to control modal visibility
+ * - questTitle: Name of the quest (displayed in modal message)
+ * - onCancel: Callback when cancel button is pressed
+ * - onConfirm: Callback when confirm button is pressed
+ */
 const AbandonQuestModal = ({ visible, questTitle, onCancel, onConfirm }) => {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.modalBox}>
+          {/* Message to user */}
           <Text style={styles.modalText}>
             Are you sure you want to abandon "{questTitle}"?
           </Text>
+
+          {/* Cancel and Confirm buttons */}
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
               <Text style={styles.buttonText}>Cancel</Text>
@@ -25,15 +37,16 @@ const AbandonQuestModal = ({ visible, questTitle, onCancel, onConfirm }) => {
 
 export default AbandonQuestModal;
 
+// Styles for the modal and its components
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.6)", // Dark transparent background
     justifyContent: "center",
     alignItems: "center",
   },
   modalBox: {
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#1E1E1E", // Dark modal background
     borderRadius: 12,
     padding: 20,
     width: "80%",
@@ -52,7 +65,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   cancelButton: {
-    backgroundColor: "#757575",
+    backgroundColor: "#757575", // Gray button
     padding: 10,
     borderRadius: 8,
     flex: 1,
@@ -60,7 +73,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmButton: {
-    backgroundColor: "#FF5722",
+    backgroundColor: "#FF5722", // Orange button
     padding: 10,
     borderRadius: 8,
     flex: 1,

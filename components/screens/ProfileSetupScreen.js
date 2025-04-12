@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image, ActivityIndicator } from "react-native";
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image, ActivityIndicator, Keyboard } from "react-native";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { FontAwesome } from "@expo/vector-icons";
@@ -8,16 +8,18 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Keyboard } from "react-native";
 
 const ProfileSetupScreen = ({ route, navigation }) => {
   const { userId, email } = route.params;
+
+  // States for form inputs and flags
   const [name, setName] = useState("");
   const [profilePic, setProfilePic] = useState(null);
   const [bio, setBio] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  // Request permissions for camera and gallery on component mount
   useEffect(() => {
     (async () => {
       const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -28,6 +30,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
     })();
   }, []);
 
+  // Resize and compress image to base64
   const processAndCompressImage = async (uri) => {
     try {
       const resizedImage = await ImageManipulator.manipulateAsync(
@@ -40,8 +43,8 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const sizeInBytes = (base64.length * 3) / 4; 
-      if (sizeInBytes > 900000) { 
+      const sizeInBytes = (base64.length * 3) / 4;
+      if (sizeInBytes > 900000) {
         throw new Error("Image is too large after compression");
       }
 
@@ -52,6 +55,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
     }
   };
 
+  // Open gallery to pick image
   const pickImage = async () => {
     try {
       let result = await ImagePicker.launchImageLibraryAsync({
@@ -70,6 +74,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
     }
   };
 
+  // Open camera to take photo
   const takePhoto = async () => {
     try {
       let result = await ImagePicker.launchCameraAsync({
@@ -87,6 +92,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
     }
   };
 
+  // Save profile data to Firestore
   const handleProfileSetup = async () => {
     if (!name) {
       setError("Please enter your name");
@@ -102,7 +108,8 @@ const ProfileSetupScreen = ({ route, navigation }) => {
 
     try {
       const base64Image = await processAndCompressImage(profilePic);
-      
+
+      // Save user document to Firestore
       await setDoc(doc(db, "users", userId), {
         userId,
         username: name,
@@ -122,10 +129,10 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         questsThisWeek: 0,
         activeMinutesToday: 0,
         activeDaysStreak: 0,
-        cyclingDistance: 0,      
+        cyclingDistance: 0,
         runningDistance: 0,
         lastActiveDay: new Date().toISOString().split("T")[0],
-        lastQuestReset: new Date().toISOString().split('T')[0],
+        lastQuestReset: new Date().toISOString().split("T")[0],
         loggedDays: 0,
         lastLoggedDay: "",
         profileComplete: name.trim() !== "" && profilePic && bio.trim() !== "",
@@ -133,10 +140,13 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         lastActive: new Date().toISOString(),
       }, { merge: true });
 
+      // Navigate to Home after saving
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
-      });      
+      });
+
+      // Clear step cache
       await AsyncStorage.removeItem("stepsToday");
       await AsyncStorage.removeItem("baseStepCount");
 
@@ -150,14 +160,16 @@ const ProfileSetupScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Logo and title */}
       <View style={styles.header}>
         <Image source={require("../../assets/fit-quest-logo.png")} style={styles.logo} />
         <Text style={styles.title}>FitQuest</Text>
       </View>
 
-
+      {/* Error message */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      {/* Name input */}
       <TextInput
         style={styles.input}
         placeholder="Name"
@@ -168,7 +180,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         onSubmitEditing={Keyboard.dismiss}
       />
 
-
+      {/* Profile picture preview and buttons */}
       <View style={styles.profilePicContainer}>
         {profilePic ? (
           <Image source={{ uri: profilePic }} style={styles.profilePic} />
@@ -176,15 +188,15 @@ const ProfileSetupScreen = ({ route, navigation }) => {
           <FontAwesome name="user-circle" size={100} color="#aaa" />
         )}
         <View style={styles.profilePicButtons}>
-          <TouchableOpacity 
-            style={styles.profilePicButton} 
+          <TouchableOpacity
+            style={styles.profilePicButton}
             onPress={pickImage}
             disabled={uploading}
           >
             <Text style={styles.profilePicButtonText}>Choose from Gallery</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.profilePicButton} 
+          <TouchableOpacity
+            style={styles.profilePicButton}
             onPress={takePhoto}
             disabled={uploading}
           >
@@ -193,6 +205,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         </View>
       </View>
 
+      {/* Bio input */}
       <TextInput
         style={styles.input}
         placeholder="Bio (Optional)"
@@ -203,14 +216,13 @@ const ProfileSetupScreen = ({ route, navigation }) => {
         }}
         maxLength={100}
         returnKeyType="done"
-        onSubmitEditing={() => {
-          Keyboard.dismiss
-        }}
+        onSubmitEditing={() => Keyboard.dismiss()}
       />
       <Text style={styles.charCount}>{bio.length}/100</Text>
 
-      <TouchableOpacity 
-        style={styles.saveButton} 
+      {/* Save profile button */}
+      <TouchableOpacity
+        style={styles.saveButton}
         onPress={handleProfileSetup}
         disabled={uploading}
       >
@@ -224,6 +236,7 @@ const ProfileSetupScreen = ({ route, navigation }) => {
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -289,7 +302,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     alignSelf: "flex-end",
     marginBottom: 10,
-  },  
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -304,7 +317,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "white",
     fontWeight: "bold",
-  },  
+  },
 });
 
 export default ProfileSetupScreen;

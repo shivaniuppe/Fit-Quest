@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Progress from 'react-native-progress';
@@ -7,33 +7,35 @@ import { doc, updateDoc, getDoc, serverTimestamp, deleteDoc } from 'firebase/fir
 import { auth, db } from "../../firebaseConfig";
 import { updateUserStatsOnQuestComplete } from "../utils/userStats";
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { Alert } from 'react-native';
 import AbandonQuestModal from "../utils/AbandonQuestModal";
-
 
 const RepsQuestScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { quest } = route.params;
 
+  // Total reps goal from quest data
   const totalReps = parseInt(quest.goal);
   const repsPerSet = 10;
   const totalSets = Math.ceil(totalReps / repsPerSet);
 
+  // State tracking sets and UI
   const [setsCompleted, setSetsCompleted] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   const repsDone = setsCompleted * repsPerSet;
-  const progress = Math.min(repsDone / totalReps, 1);
+  const progress = Math.min(repsDone / totalReps, 1); // Clamp progress to 1
 
+  // Called each time user completes a set
   const handleCompleteSet = () => {
     if (repsDone < totalReps) {
       setSetsCompleted((prev) => prev + 1);
     }
   };
 
+  // Complete quest: update Firestore, show confetti, navigate home
   const handleCompleteQuest = async () => {
     if (!auth.currentUser) return;
 
@@ -69,11 +71,13 @@ const RepsQuestScreen = () => {
       <View style={styles.innerContainer}>
         <Text style={styles.title}>{quest.title}</Text>
 
+        {/* Goal Display */}
         <View style={styles.infoRow}>
           <FontAwesome5 name={quest.icon} size={20} color="#FFD700" style={styles.icon} />
           <Text style={styles.goalText}>Goal: {totalReps} reps ({totalSets} sets)</Text>
         </View>
 
+        {/* Progress Bar */}
         <View style={styles.progressSection}>
           <Progress.Bar
             progress={progress}
@@ -88,6 +92,7 @@ const RepsQuestScreen = () => {
           </Text>
         </View>
 
+        {/* Complete Set Button */}
         <TouchableOpacity
           style={[
             styles.setButton,
@@ -99,6 +104,7 @@ const RepsQuestScreen = () => {
           <Text style={styles.buttonText}>Complete Set (+{repsPerSet} reps)</Text>
         </TouchableOpacity>
 
+        {/* Show 'Complete Quest' if done, otherwise show 'Abandon' */}
         {repsDone >= totalReps ? (
           <TouchableOpacity
             style={styles.completeButton}
@@ -114,19 +120,21 @@ const RepsQuestScreen = () => {
             <Text style={styles.buttonText}>Abandon Quest</Text>
           </TouchableOpacity>
         )}
-
-
       </View>
 
+      {/* Confetti animation when quest is completed */}
       {showConfetti && (
         <ConfettiCannon count={80} origin={{ x: 180, y: -20 }} fadeOut />
       )}
 
+      {/* XP and calories completion banner */}
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
+
+      {/* Modal to confirm quest abandonment */}
       <AbandonQuestModal
         visible={showAbandonModal}
         questTitle={quest?.title}
@@ -145,7 +153,6 @@ const RepsQuestScreen = () => {
           }
         }}
       />
-
     </SafeAreaView>
   );
 };

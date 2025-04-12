@@ -31,7 +31,7 @@ const sampleQuests = [
   { 
     title: "Walk 5,000 Steps", 
     category: "Cardio Challenge",
-    environment: "Any",
+    environment: "Outdoor",
     activityType: "Active",
     fitnessCategory: "Cardio", 
     xp: 100, 
@@ -148,7 +148,7 @@ const sampleQuests = [
   {
     title: "Walk 10,000 Steps",
     category: "Cardio Challenge",
-    environment: "Any",
+    environment: "Outdoor",
     activityType: "Active",
     fitnessCategory: "Cardio",
     xp: 150,

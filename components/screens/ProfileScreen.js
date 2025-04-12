@@ -18,11 +18,14 @@ const ProfileScreen = ({ navigation }) => {
 
   useEffect(() => {
     let unsubscribeFirestore = () => {};
+
+    // Listen to auth state changes
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       setUserData(null);
-      unsubscribeFirestore();
+      unsubscribeFirestore(); // cleanup previous snapshot listener
 
       if (!user) {
+        // If not logged in, go to Login screen
         setLoading(false);
         navigation.reset({ index: 0, routes: [{ name: "Login" }] });
         return;
@@ -30,10 +33,14 @@ const ProfileScreen = ({ navigation }) => {
 
       try {
         const userRef = doc(db, "users", user.uid);
+
+        // Real-time listener for the current user's document
         unsubscribeFirestore = onSnapshot(userRef, async (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setUserData(data);
+
+            // Award new achievements if eligible
             await checkAndAwardAchievements(userRef, data, data.achievements);
           }
           setLoading(false);
@@ -45,6 +52,7 @@ const ProfileScreen = ({ navigation }) => {
           setLoading(false);
         });
 
+        // Load all master achievements
         const snapshot = await getDocs(collection(db, "masterAchievements"));
         setAllAchievements(snapshot.docs.map(doc => doc.data()));
       } catch (error) {
@@ -59,6 +67,7 @@ const ProfileScreen = ({ navigation }) => {
     };
   }, [navigation]);
 
+  // Handle user logout
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -69,6 +78,7 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Show loading spinner while loading
   if (loading || !userData) {
     return (
       <View style={styles.container}>
@@ -77,6 +87,7 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
+  // Destructure user data with defaults
   const {
     username = "User",
     level = 1,
@@ -91,16 +102,17 @@ const ProfileScreen = ({ navigation }) => {
     bio = "",
   } = userData;
 
+  // Level and XP progress calculation
   const currentLevel = getLevelFromXP(xp);
   const xpForNextLevel = getXPForNextLevel(currentLevel);
   const xpForCurrentLevel = currentLevel === 1 ? 0 : getXPForNextLevel(currentLevel - 1);
-
   const xpProgress = xpForNextLevel > xpForCurrentLevel
     ? (xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)
     : 0;
 
   const profilePicture = profilePicBase64 || profilePic || null;
 
+  // Combine user achievements with master list and mark unlocked ones
   const achievementList = allAchievements
     .map((ach) => ({
       ...ach,
@@ -109,16 +121,18 @@ const ProfileScreen = ({ navigation }) => {
     .sort((a, b) => {
       if (a.unlocked === b.unlocked) return 0;
       return a.unlocked ? -1 : 1;
-  });
+    });
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-     
+
+      {/* Header */}
       <View style={styles.header}>
         <FontAwesome5 name="running" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.headerTitle}>Adventurer's Stats</Text>
       </View>
 
+      {/* Profile Picture, Username, Level, Title */}
       <View style={styles.profileContainer}>
         <View style={styles.profileImageContainer}>
           {profilePicture ? (
@@ -137,12 +151,14 @@ const ProfileScreen = ({ navigation }) => {
         {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
       </View>
 
+      {/* XP Progress Bar */}
       <View style={styles.xpContainer}>
         <Text style={styles.xpText}>XP Progress</Text>
         <Text style={styles.xpValue}>{xp.toLocaleString()} / {xpForNextLevel.toLocaleString()}</Text>
       </View>
       <ProgressBar progress={xpProgress} color="#4CAF50" style={styles.progressBar} />
 
+      {/* Achievements Grid */}
       <Text style={styles.sectionTitle}>Achievements</Text>
       <FlatList
         data={achievementList}
@@ -161,6 +177,7 @@ const ProfileScreen = ({ navigation }) => {
         )}
       />
 
+      {/* Workout Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{quests}</Text>
@@ -176,6 +193,7 @@ const ProfileScreen = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
@@ -183,6 +201,7 @@ const ProfileScreen = ({ navigation }) => {
   );
 };
 
+// Styles 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
   header: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginBottom: 20 },

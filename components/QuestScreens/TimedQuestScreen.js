@@ -16,13 +16,14 @@ const TimedQuestScreen = () => {
   const { quest } = route.params;
 
   const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [initialTime, setInitialTime] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0); // seconds remaining
+  const [initialTime, setInitialTime] = useState(0); // total time in seconds
   const [showConfetti, setShowConfetti] = useState(false);
   const [completionMessage, setCompletionMessage] = useState(null);
   const timerRef = useRef(null);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
 
+  // Parse quest.goal (e.g., "10:00" or "600") to set timeLeft and initialTime
   useEffect(() => {
     const loadSavedTimer = async () => {
       try {
@@ -40,6 +41,7 @@ const TimedQuestScreen = () => {
     loadSavedTimer();
   }, [quest.goal]);
 
+  // Countdown logic: decrease timeLeft every second
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
       timerRef.current = setInterval(() => {
@@ -49,9 +51,10 @@ const TimedQuestScreen = () => {
       clearInterval(timerRef.current);
     }
 
-    return () => clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current); // Cleanup on unmount or state change
   }, [isRunning, timeLeft]);
 
+  // Format seconds into MM:SS string
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -62,6 +65,7 @@ const TimedQuestScreen = () => {
     setIsRunning(true);
   };
 
+  // Mark quest as completed and update Firestore
   const handleCompleteQuest = async () => {
     if (!auth.currentUser) return;
 
@@ -79,7 +83,7 @@ const TimedQuestScreen = () => {
       if (questSnap.exists()) {
         const questData = questSnap.data();
         await updateUserStatsOnQuestComplete(userId, questData);
-        await updateActiveMinutes(userId, quest.goal);
+        await updateActiveMinutes(userId, quest.goal); // Track active minutes from this quest
 
         setCompletionMessage(`+${questData.xp} XP · ${questData.calories} kcal burned`);
         setShowConfetti(true);
@@ -93,18 +97,20 @@ const TimedQuestScreen = () => {
     }
   };
 
-  const progress = 1 - timeLeft / initialTime;
+  const progress = 1 - timeLeft / initialTime; // progress bar value
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.innerContainer}>
         <Text style={styles.title}>{quest.title}</Text>
   
+        {/* Goal Display */}
         <View style={styles.infoRow}>
           <FontAwesome5 name={quest.icon} size={20} color="#FFD700" style={styles.icon} />
           <Text style={styles.goalText}>Duration: {quest.goal}</Text>
         </View>
   
+        {/* Timer display and progress bar */}
         <View style={styles.timerContainer}>
           <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
           <Progress.Bar
@@ -118,6 +124,7 @@ const TimedQuestScreen = () => {
           />
         </View>
   
+        {/* Start / Complete / Status Buttons */}
         {!isRunning ? (
           <TouchableOpacity style={styles.startButton} onPress={handleStartTimer}>
             <Text style={styles.buttonText}>Start Timer</Text>
@@ -130,7 +137,8 @@ const TimedQuestScreen = () => {
           <Text style={styles.runningText}>Timer is running...</Text>
         )}
   
-          {timeLeft > 0 && (
+        {/* Abandon button (only available while timer is active) */}
+        {timeLeft > 0 && (
           <TouchableOpacity
             style={[styles.completeButton, { backgroundColor: "#cc3333", marginTop: 20 }]}
             onPress={() => setShowAbandonModal(true)}
@@ -138,19 +146,21 @@ const TimedQuestScreen = () => {
             <Text style={styles.buttonText}>Abandon Quest</Text>
           </TouchableOpacity>
         )}
-
       </View>
   
+      {/* Confetti effect on quest completion */}
       {showConfetti && (
         <ConfettiCannon count={80} origin={{ x: 180, y: -20 }} fadeOut />
       )}
   
+      {/* Completion message banner */}
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
   
+      {/* Modal confirmation before abandoning the quest */}
       <AbandonQuestModal
         visible={showAbandonModal}
         questTitle={quest?.title}
@@ -159,8 +169,8 @@ const TimedQuestScreen = () => {
           try {
             const userId = auth.currentUser?.uid;
             const userQuestRef = doc(db, "userQuests", `${userId}_${quest.id}`);
-            await updateDoc(userQuestRef, { status: "abandoned" });
-            await deleteDoc(userQuestRef); 
+            await updateDoc(userQuestRef, { status: "abandoned" }); // Optional before deletion
+            await deleteDoc(userQuestRef);
             setShowAbandonModal(false);
             alert("Quest abandoned. It'll return to the available quests.");
             navigation.navigate("Home", { screen: "Quests" }); 

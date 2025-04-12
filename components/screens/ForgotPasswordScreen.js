@@ -5,9 +5,10 @@ import { auth } from "../../firebaseConfig";
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPasswordScreen({ navigation }) {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");        // User's email input
+  const [message, setMessage] = useState("");    // Success or error message
 
+  // Trigger Firebase password reset email
   const handleForgotPassword = async () => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -21,6 +22,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Reset Password</Text>
 
+      {/* Email Input */}
       <TextInput
         style={styles.input}
         placeholder="Enter your email"
@@ -29,12 +31,15 @@ export default function ForgotPasswordScreen({ navigation }) {
         onChangeText={setEmail}
       />
 
+      {/* Display feedback message */}
       {message ? <Text style={styles.messageText}>{message}</Text> : null}
 
+      {/* Send Reset Link */}
       <TouchableOpacity style={styles.resetButton} onPress={handleForgotPassword}>
         <Text style={styles.resetButtonText}>Send Reset Link</Text>
       </TouchableOpacity>
 
+      {/* Navigate back to Login */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.backButtonText}>Back to Login</Text>
       </TouchableOpacity>

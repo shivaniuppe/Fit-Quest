@@ -13,12 +13,13 @@ const WellnessQuestScreen = () => {
   const route = useRoute();
   const { quest } = route.params;
 
-  const [checkedOff, setCheckedOff] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [completionMessage, setCompletionMessage] = useState(null);
-  const [showAbandonModal, setShowAbandonModal] = useState(false);
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [checkedOff, setCheckedOff] = useState(false); // Track if user marked as done
+  const [showConfetti, setShowConfetti] = useState(false); // Show celebration animation
+  const [completionMessage, setCompletionMessage] = useState(null); // Message after completion
+  const [showAbandonModal, setShowAbandonModal] = useState(false); // Modal for abandoning
+  const [isCompleting, setIsCompleting] = useState(false); // Prevent double submit
 
+  // Mark quest as completed and update stats in Firestore
   const handleCompleteQuest = async () => {
     if (!auth.currentUser || isCompleting) return;
 
@@ -36,15 +37,13 @@ const WellnessQuestScreen = () => {
       const questSnap = await getDoc(questRef);
       if (questSnap.exists()) {
         const questData = questSnap.data();
-
         await updateUserStatsOnQuestComplete(userId, questData);
 
-        setShowConfetti(true); 
-
+        setShowConfetti(true); // Trigger confetti
         setTimeout(() => {
           navigation.navigate("Home");
         }, 2500);      
-        
+
         setCompletionMessage(`+${questData.xp} XP · ${questData.calories} kcal burned`);
       }
     } catch (error) {
@@ -59,15 +58,18 @@ const WellnessQuestScreen = () => {
       <View style={styles.innerContainer}>
         <Text style={styles.title}>{quest.title}</Text>
 
+        {/* Goal and icon display */}
         <View style={styles.infoRow}>
           <FontAwesome5 name={quest.icon} size={20} color="#FFD700" style={styles.icon} />
           <Text style={styles.goalText}>Goal: {quest.goal}</Text>
         </View>
 
+        {/* Instructions */}
         <Text style={styles.instruction}>
           Once you've completed this wellness goal, tap the button below to mark it as done.
         </Text>
 
+        {/* Mark as done button */}
         <TouchableOpacity
           style={[styles.checkButton, checkedOff && styles.checked]}
           onPress={() => setCheckedOff(true)}
@@ -78,6 +80,7 @@ const WellnessQuestScreen = () => {
           </Text>
         </TouchableOpacity>
 
+        {/* Show complete button only after marking done */}
         {checkedOff && (
           <TouchableOpacity
             style={styles.completeButton}
@@ -88,6 +91,7 @@ const WellnessQuestScreen = () => {
           </TouchableOpacity>
         )}
 
+        {/* Show abandon button only if not marked done */}
         {!checkedOff && (
           <TouchableOpacity 
             style={styles.abandonButton} 
@@ -98,16 +102,19 @@ const WellnessQuestScreen = () => {
         )}
       </View>
 
+      {/* Confetti animation on quest completion */}
       {showConfetti && (
         <ConfettiCannon count={80} origin={{ x: 180, y: -20 }} fadeOut />
       )}
 
+      {/* Completion reward message */}
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
 
+      {/* Confirmation modal for abandoning quest */}
       <AbandonQuestModal
         visible={showAbandonModal}
         questTitle={quest?.title}

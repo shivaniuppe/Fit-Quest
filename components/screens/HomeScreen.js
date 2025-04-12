@@ -22,6 +22,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import AbandonQuestModal from "../utils/AbandonQuestModal";
 
 const MainHomeScreen = () => {
+  // State management for various components
   const [steps, setSteps] = useState(0);
   const [level, setLevel] = useState(1);
   const [acceptedQuests, setAcceptedQuests] = useState([]);
@@ -29,22 +30,31 @@ const MainHomeScreen = () => {
   const navigation = useNavigation();
   const user = auth.currentUser;
   const stepsGoal = 10000;
+  
+  // Weather related states
   const [weather, setWeather] = useState({
     temp: '--',
     condition: 'Loading...',
     suggestion: 'Fetching weather...',
     icon: 'cloud'
   });
+  
+  // Quest suggestion states
   const [suggestedQuest, setSuggestedQuest] = useState(null);
   const [loadingQuest, setLoadingQuest] = useState(false);
+  
+  // Modal and quest abandonment states
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [questToAbandon, setQuestToAbandon] = useState(null);
+  
+  // XP and level progression states
   const [stepsTodayBase, setStepsTodayBase] = useState(0);
   const [xp, setXP] = useState(0);
   const [xpForCurrentLevel, setXpForCurrentLevel] = useState(0);
   const [xpForNextLevel, setXpForNextLevel] = useState(100); 
   const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); 
 
+  // Track authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsLoggedIn(!!user); 
@@ -53,6 +63,7 @@ const MainHomeScreen = () => {
     return () => unsubscribe();
   }, []);
 
+  // Load steps from Firestore and handle daily reset
   const loadSteps = async () => {
     try {
       const userRef = doc(db, "users", auth.currentUser.uid);
@@ -66,6 +77,7 @@ const MainHomeScreen = () => {
         const lastUpdated = userData.lastStepsUpdateDate || null;
         const today = new Date().toISOString().split("T")[0]; 
   
+        // Reset steps if it's a new day
         if (lastUpdated !== today) {
           console.log("🕛 New day detected! Resetting stepsToday to 0.");
   
@@ -77,6 +89,7 @@ const MainHomeScreen = () => {
           setSteps(0);
           setStepsTodayBase(0);
         } else {
+          // Use existing steps if same day
           setSteps(firestoreStepsToday);
           setStepsTodayBase(firestoreStepsToday);
           console.log("🔥 stepsToday loaded from Firestore:", firestoreStepsToday);
@@ -87,73 +100,72 @@ const MainHomeScreen = () => {
     }
   };
   
-  
-useEffect(() => {
-  const now = new Date();
-  const millisTillMidnight =
-    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1) - now;
+  // Set up midnight reset for steps
+  useEffect(() => {
+    const now = new Date();
+    const millisTillMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1) - now;
 
-  const timeout = setTimeout(async () => {
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    await updateDoc(userRef, { stepsToday: 0 });
+    const timeout = setTimeout(async () => {
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(userRef, { stepsToday: 0 });
 
-    setSteps(0);
-    setStepsTodayBase(0);
-    console.log("🌙 stepsToday reset at midnight");
-  }, millisTillMidnight);
+      setSteps(0);
+      setStepsTodayBase(0);
+      console.log("🌙 stepsToday reset at midnight");
+    }, millisTillMidnight);
 
-  return () => clearTimeout(timeout);
-}, []);
+    return () => clearTimeout(timeout);
+  }, []);
 
+  // Pedometer subscription for step tracking
+  useEffect(() => {
+    let lastTrackedSteps = 0;
+    let pedometerSubscription;
 
-useEffect(() => {
-  let lastTrackedSteps = 0;
-  let pedometerSubscription;
+    const startTracking = async () => {
+      await loadSteps(); 
 
-  const startTracking = async () => {
-    await loadSteps(); 
+      pedometerSubscription = Pedometer.watchStepCount(async (result) => {
+        const currentSteps = result.steps;
+        const delta = currentSteps - lastTrackedSteps;
 
-    pedometerSubscription = Pedometer.watchStepCount(async (result) => {
-      const currentSteps = result.steps;
-      const delta = currentSteps - lastTrackedSteps;
+        if (delta > 0) {
+          const userRef = doc(db, "users", auth.currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) return;
 
-      if (delta > 0) {
-        const userRef = doc(db, "users", auth.currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) return;
+          const currentStepsToday = userSnap.data().stepsToday || 0;
+          const currentTotal = userSnap.data().totalSteps || 0;
 
-        const currentStepsToday = userSnap.data().stepsToday || 0;
-        const currentTotal = userSnap.data().totalSteps || 0;
+          const newStepsToday = currentStepsToday + delta;
+          const newTotal = currentTotal + delta;
 
-        const newStepsToday = currentStepsToday + delta;
-        const newTotal = currentTotal + delta;
+          // Update Firestore with new step counts
+          await updateDoc(userRef, {
+            stepsToday: newStepsToday,
+            totalSteps: newTotal,
+          });
 
-        await updateDoc(userRef, {
-          stepsToday: newStepsToday,
-          totalSteps: newTotal,
-        });
+          setSteps(newStepsToday);
+          setStepsTodayBase(newStepsToday);
+          lastTrackedSteps = currentSteps;
 
-        setSteps(newStepsToday);
-        setStepsTodayBase(newStepsToday);
-        lastTrackedSteps = currentSteps;
+          console.log("👟 Steps updated -> Today:", newStepsToday, "| Total:", newTotal);
+        }
+      });
+    };
 
-        console.log("👟 Steps updated -> Today:", newStepsToday, "| Total:", newTotal);
+    startTracking();
+
+    return () => {
+      if (pedometerSubscription) {
+        pedometerSubscription.remove();
       }
-    });
-  };
-
-  startTracking();
-
-  return () => {
-    if (pedometerSubscription) {
-      pedometerSubscription.remove();
-    }
-  };
-}, []);
-
-
+    };
+  }, []);
   
-  
+  // Streak tracking logic
   useEffect(() => {
     if (!auth.currentUser) return;
   
@@ -171,6 +183,7 @@ useEffect(() => {
   
         const diffDays = Math.floor((currentDay - lastDay) / (1000 * 60 * 60 * 24));
   
+        // Handle streak logic based on days since last activity
         if (diffDays === 1) {
           const newStreak = (userData.streak || 0) + 1;
           await updateDoc(userRef, {
@@ -196,11 +209,13 @@ useEffect(() => {
     checkAndUpdateStreak();
   }, []);
   
+  // Initial weather and quest fetch
   useEffect(() => {
     console.log("🌤 Calling fetchWeatherAndQuest...");
     fetchWeatherAndQuest();
   }, []);
   
+  // XP and level tracking with focus effect
   useFocusEffect(
     useCallback(() => {
       const fetchXPAndLevel = async () => {
@@ -212,6 +227,7 @@ useEffect(() => {
           const userData = userSnap.data();
           const currentXP = userData.xp || 0;
   
+          // Calculate level and XP requirements
           const userLevel = getLevelFromXP(currentXP);
           const xpNext = getXPForNextLevel(userLevel);
           const xpPrev = userLevel === 1 ? 0 : getXPForNextLevel(userLevel - 1);
@@ -227,11 +243,12 @@ useEffect(() => {
     }, [])
   );
   
-
+  // Get suggested quest based on current weather
   const getNewSuggestedQuest = async (currentWeather) => {
     try {
       if (!auth.currentUser || !currentWeather || !currentWeather.condition) return null;
   
+      // Get workout suggestion based on weather
       const suggestion = getWorkoutSuggestion({
         main: currentWeather.condition,
         temp: currentWeather.temp,
@@ -239,10 +256,12 @@ useEffect(() => {
   
       console.log('Getting quests for environment:', suggestion.environment);
   
+      // Check if user has any existing quests
       const userQuestRef = collection(db, "userQuests");
       const userQuestQuery = query(userQuestRef, where("userId", "==", auth.currentUser.uid));
       const userQuestSnapshot = await getDocs(userQuestQuery);
   
+      // If no existing quests, get any available quests
       if (userQuestSnapshot.empty) {
         const q = query(
           collection(db, "quests"),
@@ -261,6 +280,7 @@ useEffect(() => {
           : null;
       }
   
+      // Filter out completed quests
       const completedQuestIds = userQuestSnapshot.docs.map(doc => doc.data().questId);
   
       const q = query(
@@ -288,10 +308,12 @@ useEffect(() => {
     }
   };
   
+  // Fetch weather data and suggested quest
   const fetchWeatherAndQuest = async () => {
     try {
       setLoadingQuest(true);
   
+      // Request location permissions
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setWeather({
@@ -302,6 +324,7 @@ useEffect(() => {
         return;
       }
   
+      // Get current location and weather data
       const location = await Location.getCurrentPositionAsync({});
       const weatherData = await getWeatherData(
         location.coords.latitude,
@@ -313,6 +336,7 @@ useEffect(() => {
         const temp = Math.round(weatherData.main.temp);
         const condition = weatherData.weather[0].main;
   
+        // Get workout suggestion based on weather
         const suggestion = getWorkoutSuggestion({
           main: condition,
           temp: temp,
@@ -328,6 +352,7 @@ useEffect(() => {
   
         setWeather(updatedWeather);
   
+        // Get suggested quest if user is logged in
         if (auth.currentUser) {
           const newSuggestedQuest = await getNewSuggestedQuest(updatedWeather);
           setSuggestedQuest(newSuggestedQuest);
@@ -346,6 +371,7 @@ useEffect(() => {
     }
   };
   
+  // Handle accepting a suggested quest
   const handleAcceptSuggestedQuest = async () => {
     if (!user || !suggestedQuest) return;
 
@@ -353,11 +379,13 @@ useEffect(() => {
       const userQuestRef = doc(db, "userQuests", `${user.uid}_${suggestedQuest.id}`);
       const questDoc = await getDoc(userQuestRef);
       
+      // Prevent duplicate quests
       if (questDoc.exists()) {
         alert("You've already accepted this quest!");
         return;
       }
       
+      // Add quest to user's accepted quests
       await setDoc(userQuestRef, {
         userId: user.uid,
         questId: suggestedQuest.id,
@@ -367,15 +395,17 @@ useEffect(() => {
       
       alert(`Quest "${suggestedQuest.title}" accepted!`);
       
+      // Get new suggested quest
       const newSuggestedQuest = await getNewSuggestedQuest(weather);
       setSuggestedQuest(newSuggestedQuest);
 
-      
     } catch (error) {
       console.error("Error accepting quest:", error);
       alert("Failed to accept quest. Please try again.");
     }
   };
+
+  // Handle ignoring a suggested quest
   const handleIgnoreSuggestedQuest = async () => {
     if (!weather) return;
   
@@ -387,7 +417,7 @@ useEffect(() => {
     }
   };
   
-
+  // Subscribe to user's accepted quests
   useEffect(() => {
     if (!isLoggedIn) return;
   
@@ -409,6 +439,7 @@ useEffect(() => {
           return;
         }
   
+        // Fetch details for each accepted quest
         const fetchQuests = querySnapshot.docs.map(async (questDoc) => {
           const questData = questDoc.data();
           const questId = questData.questId;
@@ -449,10 +480,12 @@ useEffect(() => {
     return () => unsubscribe();
   }, [isLoggedIn]);  
   
+  // Loading state
   if (loading) {
     return <ActivityIndicator size="large" color="black" style={{ flex: 1 }} />;
   }
 
+  // Handle starting a quest
   const handleStartQuest = async (questId) => {
     if (!auth.currentUser) return;
   
@@ -460,6 +493,7 @@ useEffect(() => {
     const userQuestRef = doc(db, "userQuests", `${userId}_${questId}`);
   
     try {
+      // Update quest status to in-progress
       await updateDoc(userQuestRef, { status: "in-progress" });
       setAcceptedQuests((prevQuests) =>
         prevQuests.map((quest) =>
@@ -467,6 +501,7 @@ useEffect(() => {
         )
       );
   
+      // Navigate to appropriate quest screen based on type
       const quest = acceptedQuests.find((q) => q.id === questId);
       if (quest) {
         switch (quest.activityType) {
@@ -491,6 +526,7 @@ useEffect(() => {
     }
   };
 
+  // Handle abandoning a quest
   const handleAbandonQuest = async () => {
     if (!auth.currentUser || !questToAbandon) return;
   
@@ -500,6 +536,7 @@ useEffect(() => {
     try {
       await deleteDoc(userQuestRef); 
   
+      // Update state and UI
       setAcceptedQuests((prev) =>
         prev.filter((quest) => quest.id !== questToAbandon.id)
       );
@@ -509,10 +546,10 @@ useEffect(() => {
       alert("Quest abandoned. It'll return to the available quests.");
       navigation.navigate("Quests"); 
 
+      // Get new suggested quest
       const newSuggested = await getNewSuggestedQuest(weather);
       setSuggestedQuest(newSuggested);
 
-  
     } catch (error) {
       console.error("Error abandoning quest:", error);
       alert("Failed to abandon quest. Try again.");
@@ -521,12 +558,13 @@ useEffect(() => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-
+      {/* Header */}
       <View style={styles.headerCentered}>
         <FontAwesome5 name="columns" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.headerTitle}>Dashboard</Text>
       </View>
 
+      {/* User profile and progress section */}
       <View style={styles.topBarCombined}>
         <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.avatar} />
         <View style={styles.levelStepsBlock}>
@@ -569,10 +607,9 @@ useEffect(() => {
             style={{ marginTop: 4 }}
           />
         </View>
-        </View>
+      </View>
 
-
-
+      {/* Weather and suggested quest card */}
       <View style={styles.weatherQuestCard}>
         <View style={styles.weatherSection}>
           <FontAwesome5 
@@ -618,8 +655,6 @@ useEffect(() => {
                   <Text style={styles.buttonText}>Ignore</Text>
                 </TouchableOpacity>
               </View>
-
-
             </View>
           </View>
         ) : (
@@ -631,6 +666,7 @@ useEffect(() => {
         )}
       </View>
 
+      {/* List of accepted quests */}
       {acceptedQuests.length > 0 ? (
         <FlatList
           data={[...acceptedQuests].sort((a, b) => {
@@ -680,11 +716,8 @@ useEffect(() => {
                   <Text style={styles.buttonText}>Abandon</Text>
                 </TouchableOpacity>
               )}
-
-
               </View>
             </View>   
-                   
           )}
         />
       ) : (
@@ -695,6 +728,8 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       )}
+      
+      {/* Abandon quest confirmation modal */}
       <AbandonQuestModal
         visible={showAbandonModal}
         questTitle={questToAbandon?.title}
@@ -704,29 +739,26 @@ useEffect(() => {
         }}
         onConfirm={handleAbandonQuest}
       />
-
-
     </SafeAreaView>
-  
   );
 };
 
-
+// Bottom tab navigator setup
 const Tab = createBottomTabNavigator();
 
 const HomeScreen = () => {
   return (
-        <Tab.Navigator
-          screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-              backgroundColor: "#1E1E1E", 
-              borderTopColor: "#333",     
-            },
-            tabBarActiveTintColor: "#4CAF50", 
-            tabBarInactiveTintColor: "#CCCCCC", 
-          }}
-        >
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: "#1E1E1E", 
+          borderTopColor: "#333",     
+        },
+        tabBarActiveTintColor: "#4CAF50", 
+        tabBarInactiveTintColor: "#CCCCCC", 
+      }}
+    >
       <Tab.Screen name="Dashboard" component={MainHomeScreen} options={{ tabBarIcon: ({ color }) => <FontAwesome name="home" size={24} color={color} /> }} />
       <Tab.Screen name="Quests" component={QuestsScreen} options={{ tabBarIcon: ({ color }) => <Ionicons name="list-outline" size={24} color={color} /> }} />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} options={{ tabBarIcon: ({ color }) => <FontAwesome name="trophy" size={24} color={color} /> }} />
@@ -737,6 +769,7 @@ const HomeScreen = () => {
 
 export default HomeScreen;
 
+// Stylesheet
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 

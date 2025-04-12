@@ -7,20 +7,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { onAuthStateChanged } from "firebase/auth";
 
 const LeaderboardScreen = () => {
+  // States to store top 3 players, rest of the players, loading status, refresh status and login status
   const [topPlayers, setTopPlayers] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser);
 
+  // Watch auth state to update login status
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsLoggedIn(!!user);
     });
-
     return () => unsubscribe();
   }, []);
 
+  // Subscribe to the leaderboard data when user is logged in
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -33,25 +35,30 @@ const LeaderboardScreen = () => {
         if (!auth.currentUser) return;
 
         try {
+          // Get users and mark current user
           const usersData = querySnapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
             isYou: doc.id === auth.currentUser?.uid,
           }));
 
+          // Format XP with commas
           const formatXP = (xp) => xp?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ",") || "0";
 
+          // Add ranks and format XP
           const rankedUsers = usersData.map((player, index) => ({
             ...player,
             xp: `${formatXP(player.xp)} XP`,
             rank: index + 1,
           }));
 
+          // Extract top 3 players
           const topPlayers = rankedUsers.slice(0, 3).map((player, index) => ({
             ...player,
             position: `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`,
           }));
 
+          // Rest of the players
           const otherPlayers = rankedUsers.slice(3);
 
           setTopPlayers(topPlayers);
@@ -63,6 +70,7 @@ const LeaderboardScreen = () => {
         }
       },
       (error) => {
+        // Handle snapshot errors, especially after logout
         if (error.code === "permission-denied") {
           console.warn("❌ LeaderboardScreen snapshot blocked after logout");
           setTopPlayers([]);
@@ -78,11 +86,13 @@ const LeaderboardScreen = () => {
     return () => unsubscribe();
   }, [isLoggedIn]);
 
+  // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
     setRefreshing(false);
   };
 
+  // Render profile picture or fallback
   const renderProfilePicture = (player) => {
     if (player.profilePicBase64) {
       return <Image source={{ uri: player.profilePicBase64 }} style={styles.avatar} />;
@@ -97,24 +107,27 @@ const LeaderboardScreen = () => {
     );
   };
 
+  // Show loading spinner until data is ready
   if (loading) {
     return <ActivityIndicator size="large" color="white" style={{ flex: 1 }} />;
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* Header */}
       <View style={styles.headerCentered}>
         <FontAwesome name="trophy" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.headerTitle}>Top Adventurers</Text>
       </View>
 
+      {/* Top 3 players displayed in cards */}
       <View style={styles.topContainer}>
         {topPlayers.map((player) => (
           <View
             key={player.id}
             style={[
               styles.topCard,
-              player.isYou && styles.highlighted
+              player.isYou && styles.highlighted // Highlight if current user
             ]}
           >
             <Text style={styles.positionText}>{player.position}</Text>
@@ -123,6 +136,7 @@ const LeaderboardScreen = () => {
               {player.isYou ? "You" : player.username || 'Anonymous'}
             </Text>
             <Text style={styles.xpText}>{player.xp}</Text>
+            {/* Show crown for yourself if in top 3 */}
             {player.isYou && (
               <FontAwesome5 name="crown" size={18} color="white" style={{ marginTop: 6 }} />
             )}
@@ -130,6 +144,7 @@ const LeaderboardScreen = () => {
         ))}
       </View>
 
+      {/* List of players from rank 4 onwards */}
       <FlatList
         data={players}
         keyExtractor={(item) => item.id}
@@ -143,6 +158,7 @@ const LeaderboardScreen = () => {
               </Text>
               <Text style={styles.xpText}>{item.xp}</Text>
             </View>
+            {/* Crown for current user if not in top 3 */}
             {item.isYou && (
               <FontAwesome5 name="crown" size={16} color="white" style={styles.crownIcon} />
             )}
@@ -158,6 +174,7 @@ const LeaderboardScreen = () => {
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
   headerTitle: {

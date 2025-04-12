@@ -12,6 +12,7 @@ const MapQuestScreen = ({ route }) => {
   const [destination, setDestination] = useState(null);
   const navigation = useNavigation();
 
+  // Get user’s current location
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -21,18 +22,20 @@ const MapQuestScreen = ({ route }) => {
     })();
   }, []);
 
+  // Convert quest goal (steps/km) to distance in meters
   const getDistanceFromGoal = (goal) => {
     if (goal.toLowerCase().includes("km")) {
       return parseFloat(goal.replace("km", "")) * 1000;
     } else {
       const steps = parseInt(goal);
-      return Math.round(steps * 0.762);
+      return Math.round(steps * 0.762); // average stride length
     }
   };
 
+  // Estimate duration in minutes based on goal and activity type
   const estimateDurationFromGoal = (goal, icon) => {
     let pacePerKm;
-  
+
     switch (icon) {
       case "running":
         pacePerKm = 4.5;
@@ -44,9 +47,9 @@ const MapQuestScreen = ({ route }) => {
         pacePerKm = 6.0;
         break;
       default:
-        pacePerKm = 6.0; 
+        pacePerKm = 6.0;
     }
-  
+
     if (goal.toLowerCase().includes("km")) {
       const km = parseFloat(goal.replace("km", ""));
       return Math.round(km * pacePerKm);
@@ -56,8 +59,8 @@ const MapQuestScreen = ({ route }) => {
       return avgStepsPerMin ? Math.round(steps / avgStepsPerMin) : 0;
     }
   };
-  
 
+  // Haversine formula to compute distance between two lat/lng points
   const getDistanceBetweenPoints = (lat1, lon1, lat2, lon2) => {
     const R = 6371000;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -70,6 +73,7 @@ const MapQuestScreen = ({ route }) => {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
+  // Fetch nearby destinations using Google Places API
   const fetchNearbyDestinations = async (latitude, longitude, radius) => {
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&key=${GOOGLE_API_KEY}`;
     try {
@@ -82,16 +86,17 @@ const MapQuestScreen = ({ route }) => {
     }
   };
 
+  // Select a destination near the target distance
   const pickDestination = async () => {
     if (!location) {
       alert("Location not available yet.");
       return;
     }
 
-    setDestination(null);
+    setDestination(null); // Clear any previous destination
 
     const targetDistance = getDistanceFromGoal(quest.goal);
-    const searchRadius = Math.max(targetDistance + 1000, 5000);
+    const searchRadius = Math.max(targetDistance + 1000, 5000); // Adjusted radius for better results
 
     try {
       const places = await fetchNearbyDestinations(
@@ -105,6 +110,7 @@ const MapQuestScreen = ({ route }) => {
         return;
       }
 
+      // Filter places within ±200m of target distance
       const allDistances = places.map((place) => ({
         place,
         dist: getDistanceBetweenPoints(
@@ -119,6 +125,7 @@ const MapQuestScreen = ({ route }) => {
         .filter(d => Math.abs(d.dist - targetDistance) <= 200)
         .map(d => d.place);
 
+      // Randomly choose from filtered or all if no close match
       const chosen =
         filtered.length > 0
           ? filtered[Math.floor(Math.random() * filtered.length)]
@@ -131,6 +138,7 @@ const MapQuestScreen = ({ route }) => {
     }
   };
 
+  // Navigate to the JourneyScreen with chosen destination
   const startJourney = () => {
     if (!destination) {
       alert("Please pick a destination first.");
@@ -155,6 +163,7 @@ const MapQuestScreen = ({ route }) => {
             longitudeDelta: 0.0421,
           }}
         >
+          {/* Current location marker */}
           <Marker
             coordinate={{
               latitude: location.coords.latitude,
@@ -163,6 +172,7 @@ const MapQuestScreen = ({ route }) => {
             title="Your Location"
             description="You are here"
           />
+          {/* Destination marker */}
           {destination && (
             <Marker
               coordinate={{
@@ -178,6 +188,7 @@ const MapQuestScreen = ({ route }) => {
         <Text style={styles.mapPlaceholder}>Loading map...</Text>
       )}
 
+      {/* Quest card with challenge info */}
       <View style={styles.challengeCard}>
         <View style={styles.challengeHeader}>
           <Text style={styles.goalText}>
@@ -186,6 +197,7 @@ const MapQuestScreen = ({ route }) => {
           <MaterialIcons name="directions-run" size={20} color="white" />
         </View>
 
+        {/* XP, time, and calorie stats */}
         <View style={styles.statsContainer}>
           <Text style={styles.stat}>
             <FontAwesome5 name="fire" color="white" /> {quest.calories} cal
@@ -198,6 +210,7 @@ const MapQuestScreen = ({ route }) => {
           </Text>
         </View>
 
+        {/* Buttons to pick destination or start journey */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.pickDestinationButton} onPress={pickDestination}>
             <Text style={styles.buttonText}>Pick Destination</Text>
@@ -223,8 +236,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 10,
     color: "#fff",
+    textAlign: "center",
   },
   map: {
     flex: 1,
@@ -270,58 +284,35 @@ const styles = StyleSheet.create({
   },
   pickDestinationButton: {
     backgroundColor: "#4CAF50",
-    padding: 12,
-    borderRadius: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
     flex: 1,
     marginRight: 5,
-    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   startButton: {
     backgroundColor: "cyan",
-    padding: 12,
-    borderRadius: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
     flex: 1,
     marginLeft: 5,
-    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   buttonText: {
     color: "#0d0d0d",
     fontWeight: "bold",
     fontSize: 16,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#fff",
-    textAlign: "center",
-  },
-  pickDestinationButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    flex: 1,
-    marginRight: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  startButton: {
-    backgroundColor: "cyan",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    flex: 1,
-    marginLeft: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },  
 });

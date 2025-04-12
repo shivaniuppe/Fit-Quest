@@ -108,6 +108,7 @@ const JourneyScreen = ({ route }) => {
   const [completionMessage, setCompletionMessage] = useState(null);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
 
+  // Memoize user origin and destination to prevent unnecessary re-renders
   const origin = useMemo(() => {
     if (!location) return null;
     return {
@@ -124,6 +125,7 @@ const JourneyScreen = ({ route }) => {
     };
   }, [destination]);
 
+  // Request location permissions and start tracking user's location
   useEffect(() => {
     let subscription;
 
@@ -162,9 +164,10 @@ const JourneyScreen = ({ route }) => {
     };
 
     startTracking();
-    return () => subscription?.remove();
+    return () => subscription?.remove(); // Clean up on unmount
   }, []);
 
+  // Utility function to calculate distance (Haversine formula)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -179,6 +182,7 @@ const JourneyScreen = ({ route }) => {
     return R * c;
   };
 
+  // Trigger quest completion when user is within 100 meters of destination
   useEffect(() => {
     if (location && destination && !questCompleted) {
       const distance = calculateDistance(
@@ -196,6 +200,7 @@ const JourneyScreen = ({ route }) => {
     }
   }, [location]);
 
+  // After showing completion message, navigate back to home screen
   useEffect(() => {
     if (completionMessage) {
       setTimeout(() => {
@@ -205,6 +210,7 @@ const JourneyScreen = ({ route }) => {
     }
   }, [completionMessage]);
 
+  // Complete quest and update XP, calories, and distance stats
   const completeRunQuest = async () => {
     try {
       const userId = auth.currentUser.uid;
@@ -220,6 +226,7 @@ const JourneyScreen = ({ route }) => {
         const questData = questSnap.data();
         await updateUserStatsOnQuestComplete(userId, questData);
 
+         // Estimate distance from quest goal (km or steps)
         let distanceInKm = 0;
         if (quest.goal.toLowerCase().includes("km")) {
           distanceInKm = parseFloat(quest.goal.toLowerCase().replace("km", "").trim());
@@ -227,6 +234,7 @@ const JourneyScreen = ({ route }) => {
           distanceInKm = parseFloat(quest.goal) * 0.000762;
         }
 
+        // Update distance stats for cycling or running
         if (quest.title.toLowerCase().includes("cycle")) {
           await updateDistanceStat(userId, distanceInKm, "cyclingDistance");
         } else if (quest.title.toLowerCase().includes("run")) {
@@ -239,6 +247,8 @@ const JourneyScreen = ({ route }) => {
       console.error("❌ Error completing run quest:", error);
     }   
   };
+
+  // Abandon quest and delete from Firestore
   const handleAbandonQuest = async () => {
     try {
       const userId = auth.currentUser?.uid;
@@ -255,10 +265,12 @@ const JourneyScreen = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      {/* Quest title overlay */}
       <View style={styles.overlay}>
         <Text style={styles.overlayText}>{quest.title}</Text>
       </View>
 
+      {/* Map rendering */}
       {location && region ? (
         <MapView
           ref={mapRef}
@@ -267,6 +279,7 @@ const JourneyScreen = ({ route }) => {
           customMapStyle={darkMapStyle}
           onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
         >
+          {/* Current location marker */}
           <Marker
             coordinate={{
               latitude: location.coords.latitude,
@@ -275,6 +288,7 @@ const JourneyScreen = ({ route }) => {
             title="Your Location"
             description="You are here"
           />
+          {/* Destination marker */}
           {destination && (
             <Marker
               coordinate={{
@@ -285,6 +299,7 @@ const JourneyScreen = ({ route }) => {
               description="Your destination"
             />
           )}
+          {/* Route between origin and destination */}
           {origin && memoizedDestination && (
             <MapViewDirections
               origin={origin}
@@ -299,6 +314,7 @@ const JourneyScreen = ({ route }) => {
         <Text style={styles.mapPlaceholder}>Loading map...</Text>
       )}
 
+      {/* Confetti animation */}
       {showConfetti && (
         <ConfettiCannon
           count={150}
@@ -308,11 +324,13 @@ const JourneyScreen = ({ route }) => {
         />
       )}
 
+      {/* Completion banner */}
       {completionMessage && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>🎉 Quest Complete! {completionMessage}</Text>
         </View>
       )}
+      {/* Abandon quest button */}
       {!questCompleted && (
         <TouchableOpacity
           style={{
@@ -331,7 +349,7 @@ const JourneyScreen = ({ route }) => {
         </TouchableOpacity>
       )}
 
-
+      {/* Reusable abandon confirmation modal */}
       <AbandonQuestModal
         visible={showAbandonModal}
         questTitle={quest?.title}

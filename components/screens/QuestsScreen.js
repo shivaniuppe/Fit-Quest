@@ -7,11 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { onAuthStateChanged } from "firebase/auth";
 
 const QuestsScreen = ({ navigation }) => {
-  const [quests, setQuests] = useState([]);
-  const [acceptedQuests, setAcceptedQuests] = useState([]);
-  const [activeTab, setActiveTab] = useState("available"); 
-  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); 
+  const [quests, setQuests] = useState([]); // All quests from master list
+  const [acceptedQuests, setAcceptedQuests] = useState([]); // User's accepted quests
+  const [activeTab, setActiveTab] = useState("available"); // Tab state
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); // Auth status
 
+  // Listen to auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsLoggedIn(!!user); 
@@ -20,7 +21,7 @@ const QuestsScreen = ({ navigation }) => {
     return () => unsubscribe();
   }, []);
 
-
+  // Fetch all available quests from Firestore
   useEffect(() => {
     const fetchQuests = async () => {
       const querySnapshot = await getDocs(collection(db, "quests"));
@@ -31,6 +32,7 @@ const QuestsScreen = ({ navigation }) => {
     fetchQuests();
   }, []);
 
+  // Listen for real-time updates to user's accepted quests
   useEffect(() => {
     if (!isLoggedIn) {
       setAcceptedQuests([]); 
@@ -64,6 +66,7 @@ const QuestsScreen = ({ navigation }) => {
     return () => unsubscribe();
   }, [isLoggedIn]);
   
+  // Filter logic for tabs
   const availableQuests = quests.filter(
     (quest) => !acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === quest.id)
   );
@@ -71,6 +74,7 @@ const QuestsScreen = ({ navigation }) => {
     acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === quest.id)
   );
 
+  // Render quests based on selected tab
   const renderQuests = () => {
     if (activeTab === "available") {
       return (
@@ -79,6 +83,7 @@ const QuestsScreen = ({ navigation }) => {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.questCard}>
+              {/* Quest info display */}
               <View style={styles.questInfo}>
                 {item.iconType === "FontAwesome5" && (
                   <FontAwesome5 name={item.icon} size={20} color="white" style={styles.questIcon} />
@@ -88,11 +93,15 @@ const QuestsScreen = ({ navigation }) => {
                   <Text style={styles.questCategory}>{item.category}</Text>
                 </View>
               </View>
+
+              {/* XP value */}
               <Text style={styles.questXP}>⭐ {item.xp} XP</Text>
+
+              {/* Accept quest button */}
               <TouchableOpacity
                 style={styles.acceptButton}
                 onPress={async () => {
-                  if (!auth.currentUser || acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === item.id)) return;
+                  if (!auth.currentUser || acceptedQuests.some((q) => q.questId === item.id)) return;
 
                   const userId = auth.currentUser.uid;
                   const userQuestRef = doc(db, "userQuests", `${userId}_${item.id}`);
@@ -112,7 +121,7 @@ const QuestsScreen = ({ navigation }) => {
                     console.error("Error accepting quest:", error);
                   }
                 }}
-                disabled={acceptedQuests.some((acceptedQuest) => acceptedQuest.questId === item.id)}
+                disabled={acceptedQuests.some((q) => q.questId === item.id)}
               >
                 <Text style={styles.acceptButtonText}>Accept Quest</Text>
               </TouchableOpacity>
@@ -126,9 +135,7 @@ const QuestsScreen = ({ navigation }) => {
           data={acceptedQuestsList}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            const questStatus = acceptedQuests.find(
-              (acceptedQuest) => acceptedQuest.questId === item.id
-            )?.status;
+            const questStatus = acceptedQuests.find((q) => q.questId === item.id)?.status;
 
             return (
               <View style={styles.questCard}>
@@ -141,9 +148,15 @@ const QuestsScreen = ({ navigation }) => {
                     <Text style={styles.questCategory}>{item.category}</Text>
                   </View>
                 </View>
+
                 <Text style={styles.questXP}>⭐ {item.xp} XP</Text>
+
+                {/* Accepted or completed status button (disabled) */}
                 <TouchableOpacity
-                  style={[styles.acceptButton, { backgroundColor: questStatus === "completed" ? "#4CAF50" : "gray" }]}
+                  style={[
+                    styles.acceptButton,
+                    { backgroundColor: questStatus === "completed" ? "#4CAF50" : "gray" },
+                  ]}
                   disabled
                 >
                   <Text style={styles.acceptButtonText}>
@@ -160,12 +173,13 @@ const QuestsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-
+      {/* Header */}
       <View style={styles.headerCentered}>
         <FontAwesome5 name="scroll" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={styles.title}>Select Your Quest</Text>
       </View>
 
+      {/* Tab bar for Available vs Accepted */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === "available" && styles.activeTab]}
@@ -181,11 +195,13 @@ const QuestsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Render quest list */}
       {renderQuests()}
     </SafeAreaView>
   );
 };
 
+// Styles 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
@@ -227,7 +243,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 15,
   },
-  
 });
 
 export default QuestsScreen;

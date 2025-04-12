@@ -1,25 +1,31 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { sendEmailVerification } from "firebase/auth";
 
 export default function SignupScreen({ navigation }) {
+  // Input states
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  // Handle user registration
   const handleSignup = async () => {
     try {
+      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      await sendEmailVerification(user); 
-  
+
+      // Send email verification
+      await sendEmailVerification(user);
+
+      // Navigate to VerifyEmail screen with email param
       navigation.navigate("VerifyEmail", {
         email: user.email,
       });
     } catch (err) {
+      // Handle common signup errors
       switch (err.code) {
         case "auth/invalid-email":
           setError("Please enter a valid email address.");
@@ -38,11 +44,13 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Logo and title */}
       <View style={styles.header}>
         <Image source={require("../../assets/fit-quest-logo.png")} style={styles.logo} />
         <Text style={styles.title}>FitQuest</Text>
       </View>
 
+      {/* Email input */}
       <TextInput 
         style={styles.input} 
         placeholder="Email" 
@@ -51,6 +59,7 @@ export default function SignupScreen({ navigation }) {
         onChangeText={setEmail} 
       />
 
+      {/* Password input */}
       <TextInput 
         style={styles.input} 
         placeholder="Password" 
@@ -60,12 +69,15 @@ export default function SignupScreen({ navigation }) {
         secureTextEntry 
       />
 
+      {/* Error display */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      {/* Signup button */}
       <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
         <Text style={styles.signupButtonText}>Sign Up</Text>
       </TouchableOpacity>
 
+      {/* Navigate to Login screen */}
       <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate("Login")}>
         <Text style={styles.loginButtonText}>Login</Text>
       </TouchableOpacity>
@@ -73,6 +85,7 @@ export default function SignupScreen({ navigation }) {
   );
 }
 
+// Styles 
 const styles = StyleSheet.create({
   container: {
     flex: 1,

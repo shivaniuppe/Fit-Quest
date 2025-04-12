@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect} from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import LoginScreen from "./components/screens/LoginScreen";
@@ -18,10 +18,10 @@ import VerifyEmailScreen from "./components/screens/VerifyEmailScreen";
 const Stack = createStackNavigator();
 
 export default function App() {
-  useEffect(() => {
-    uploadQuests();
-    uploadAchievements();
-  }, []);
+  //useEffect(() => {
+   // uploadQuests();
+    //uploadAchievements();
+  //}, []);
 
   return (
     <NavigationContainer>
