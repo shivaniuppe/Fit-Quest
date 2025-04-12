@@ -3,6 +3,7 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "reac
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { sendEmailVerification } from "firebase/auth";
 
 export default function SignupScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -13,13 +14,25 @@ export default function SignupScreen({ navigation }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      await sendEmailVerification(user); 
   
-      navigation.navigate("ProfileSetup", {
-        userId: user.uid,
+      navigation.navigate("VerifyEmail", {
         email: user.email,
       });
     } catch (err) {
-      setError(err.message);
+      switch (err.code) {
+        case "auth/invalid-email":
+          setError("Please enter a valid email address.");
+          break;
+        case "auth/email-already-in-use":
+          setError("This email is already registered.");
+          break;
+        case "auth/weak-password":
+          setError("Password should be at least 6 characters long.");
+          break;
+        default:
+          setError("Something went wrong. Please try again.");
+      }
     }
   };
 

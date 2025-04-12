@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { doc, getDoc } from "firebase/firestore";
 
 
 export default function LoginScreen({ navigation }) {
@@ -11,17 +12,52 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      await AsyncStorage.removeItem("stepsToday");
-      await AsyncStorage.removeItem("baseStepCount");
-      navigation.navigate("Home");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
+      if (!user.emailVerified) {
+        setError("Please verify your email before logging in.");
+        return;
+      }
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        navigation.navigate("ProfileSetup", {
+          userId: user.uid,
+          email: user.email,
+        });
+      } else {
+        await AsyncStorage.removeItem("stepsToday");
+        await AsyncStorage.removeItem("baseStepCount");
+        navigation.navigate("Home");
+      }
+    } catch (err) {
+        switch (err.code) {
+          case "auth/invalid-email":
+            setError("Please enter a valid email address.");
+            break;
+          case "auth/user-not-found":
+          case "auth/wrong-password":
+          case "auth/invalid-credential": // 👈 add this
+            setError("Incorrect email or password.");
+            break;
+          case "auth/email-already-in-use":
+            setError("This email is already registered.");
+            break;
+          case "auth/weak-password":
+            setError("Password should be at least 6 characters.");
+            break;
+          default:
+            setError("Something went wrong. Please try again.");
+        }      
+      }
+    };
+  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>

@@ -13,6 +13,7 @@ import TimedQuestScreen from "./components/QuestScreens/TimedQuestScreen";
 import WellnessQuestScreen from "./components/QuestScreens/WellnessQuestScreen";
 import { uploadQuests } from "./components/utils/uploadQuests"; 
 import { uploadAchievements } from './components/utils/uploadAchievements';
+import VerifyEmailScreen from "./components/screens/VerifyEmailScreen";
 
 const Stack = createStackNavigator();
 
@@ -29,6 +30,7 @@ export default function App() {
         <Stack.Screen name="Signup" component={SignupScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={MainHomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MapQuestScreen" component={MapQuestScreen} options={{ headerShown: false }} />
         <Stack.Screen name="JourneyScreen" component={JourneyScreen} options={{ headerShown: false }} />
