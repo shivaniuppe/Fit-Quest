@@ -107,4 +107,3 @@ Course: CSCI 5708 – Mobile Computing
 ## 📜 License
 
 This project is for academic and demonstration purposes only.
-```
