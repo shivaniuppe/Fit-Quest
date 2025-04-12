@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Image } from "react-native";
-import { FontAwesome } from "@expo/vector-icons";
+import { FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { auth, db } from "../../firebaseConfig";
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,50 +11,49 @@ const LeaderboardScreen = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser); 
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user); 
+      setIsLoggedIn(!!user);
     });
 
     return () => unsubscribe();
   }, []);
 
-
   useEffect(() => {
     if (!isLoggedIn) return;
-  
+
     setLoading(true);
     const usersQuery = query(collection(db, "users"), orderBy("xp", "desc"));
-  
+
     const unsubscribe = onSnapshot(
       usersQuery,
       (querySnapshot) => {
-        if (!auth.currentUser) return; 
-  
+        if (!auth.currentUser) return;
+
         try {
           const usersData = querySnapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
             isYou: doc.id === auth.currentUser?.uid,
           }));
-  
+
           const formatXP = (xp) => xp?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ",") || "0";
-  
+
           const rankedUsers = usersData.map((player, index) => ({
             ...player,
             xp: `${formatXP(player.xp)} XP`,
             rank: index + 1,
           }));
-  
+
           const topPlayers = rankedUsers.slice(0, 3).map((player, index) => ({
             ...player,
             position: `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`,
           }));
-  
+
           const otherPlayers = rankedUsers.slice(3);
-  
+
           setTopPlayers(topPlayers);
           setPlayers(otherPlayers);
           setLoading(false);
@@ -75,10 +74,9 @@ const LeaderboardScreen = () => {
         }
       }
     );
-  
+
     return () => unsubscribe();
   }, [isLoggedIn]);
-  
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -112,11 +110,22 @@ const LeaderboardScreen = () => {
 
       <View style={styles.topContainer}>
         {topPlayers.map((player) => (
-          <View key={player.id} style={styles.topCard}>
+          <View
+            key={player.id}
+            style={[
+              styles.topCard,
+              player.isYou && styles.highlighted
+            ]}
+          >
             <Text style={styles.positionText}>{player.position}</Text>
             {renderProfilePicture(player)}
-            <Text style={styles.playerName}>{player.username || 'Anonymous'}</Text>
+            <Text style={styles.playerName}>
+              {player.isYou ? "You" : player.username || 'Anonymous'}
+            </Text>
             <Text style={styles.xpText}>{player.xp}</Text>
+            {player.isYou && (
+              <FontAwesome5 name="crown" size={18} color="white" style={{ marginTop: 6 }} />
+            )}
           </View>
         ))}
       </View>
@@ -129,10 +138,14 @@ const LeaderboardScreen = () => {
             <Text style={styles.rankText}>{item.rank}</Text>
             {renderProfilePicture(item)}
             <View style={styles.playerInfo}>
-              <Text style={styles.playerName}>{item.name || 'Anonymous'}</Text>
+              <Text style={styles.playerName}>
+                {item.isYou ? "You" : item.username || 'Anonymous'}
+              </Text>
               <Text style={styles.xpText}>{item.xp}</Text>
             </View>
-            {item.isYou && <FontAwesome name="crown" size={16} color="white" style={styles.crownIcon} />}
+            {item.isYou && (
+              <FontAwesome5 name="crown" size={16} color="white" style={styles.crownIcon} />
+            )}
           </View>
         )}
         refreshing={refreshing}
@@ -145,18 +158,18 @@ const LeaderboardScreen = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", padding: 20 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
   headerTitle: {
     color: "white",
     fontSize: 20,
     fontWeight: "bold",
+  },
+  headerCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   topContainer: {
     flexDirection: "row",
@@ -168,18 +181,22 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+    justifyContent: "center",
     width: "30%",
+  },
+  highlighted: {
+    backgroundColor: "#333",
   },
   positionText: {
     color: "#bbb",
     fontSize: 14,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   defaultAvatar: {
     width: 50,
@@ -187,7 +204,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
     backgroundColor: "#333",
   },
   playerName: {
@@ -200,6 +217,7 @@ const styles = StyleSheet.create({
     color: "#aaa",
     fontSize: 12,
     textAlign: "center",
+    marginTop: 4,
   },
   playerRow: {
     flexDirection: "row",
@@ -208,9 +226,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
-  },
-  highlighted: {
-    backgroundColor: "#333",
   },
   rankText: {
     color: "white",
@@ -224,14 +239,8 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   crownIcon: {
-    marginLeft: "auto",
+    marginLeft: 8,
   },
-  headerCentered: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },  
 });
 
 export default LeaderboardScreen;

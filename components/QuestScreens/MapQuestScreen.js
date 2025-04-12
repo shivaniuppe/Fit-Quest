@@ -30,16 +30,33 @@ const MapQuestScreen = ({ route }) => {
     }
   };
 
-  const estimateDurationFromGoal = (goal) => {
+  const estimateDurationFromGoal = (goal, icon) => {
+    let pacePerKm;
+  
+    switch (icon) {
+      case "running":
+        pacePerKm = 4.5;
+        break;
+      case "bicycle":
+        pacePerKm = 2.0;
+        break;
+      case "shoe-prints":
+        pacePerKm = 6.0;
+        break;
+      default:
+        pacePerKm = 6.0; 
+    }
+  
     if (goal.toLowerCase().includes("km")) {
       const km = parseFloat(goal.replace("km", ""));
-      return Math.round(km * 6); 
+      return Math.round(km * pacePerKm);
     } else {
       const steps = parseInt(goal);
-      const avgStepsPerMin = 80;
-      return Math.round(steps / avgStepsPerMin);
+      const avgStepsPerMin = icon === "running" ? 160 : icon === "shoe-prints" ? 80 : 0;
+      return avgStepsPerMin ? Math.round(steps / avgStepsPerMin) : 0;
     }
   };
+  
 
   const getDistanceBetweenPoints = (lat1, lon1, lat2, lon2) => {
     const R = 6371000;
@@ -122,7 +139,7 @@ const MapQuestScreen = ({ route }) => {
     navigation.navigate("JourneyScreen", { destination, quest });
   };
 
-  const estimatedTime = estimateDurationFromGoal(quest.goal); 
+  const estimatedTime = estimateDurationFromGoal(quest.goal, quest.icon); 
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

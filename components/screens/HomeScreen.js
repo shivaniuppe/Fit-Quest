@@ -524,7 +524,7 @@ useEffect(() => {
 
       <View style={styles.headerCentered}>
         <FontAwesome5 name="columns" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-        <Text style={styles.headerTitle}>Your Dashboard</Text>
+        <Text style={styles.headerTitle}>Dashboard</Text>
       </View>
 
       <View style={styles.topBarCombined}>
